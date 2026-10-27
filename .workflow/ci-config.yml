@@ -1,16 +1,13 @@
-# Domain CI Configuration — LocalDuck (DuckDB-local) platform
-#
-# Installed once by the `/install-ci` skill, which copies this template and
-# substitutes this Domain's coordinates. The file then belongs to the
-# repository: nothing rewrites it, and your edits persist.
+# Domain CI Configuration — MotherDuck (rung 6 validation copy)
+VD_DOMAIN_DATA_PLATFORM: motherduck
+VD_DOMAIN_SLUG: nyc-taxi-motherduck-demo
+VD_DOMAIN_SCHEMA: main
+VD_DOMAIN_MOTHERDUCK_DATABASE: sa_prd
 
-# Platform discriminator. Must be exactly "duckdb_local" for this bundle.
-VD_DOMAIN_DATA_PLATFORM: duckdb_local
+VD_DOMAIN_PROD_MANIFEST_SOURCE:
+  mode: artifact
 
-# Short slug identifying this domain (kebab-case).
-VD_DOMAIN_SLUG: nyc-taxi-duckdb-demo
-
-# LocalDuck runs database-free static PR validation (ADR hygiene, linting, secret
-# scanning, dbt parse/compile, schema validation, scorecard) — there is no target
-# platform, no production database, and no prod-state manifest to configure, so
-# no further keys are required.
+MOTHERDUCK_TOKEN_VAR: VD_CI_MOTHERDUCK_TOKEN
+LLM_API_KEY_VAR: VD_CI_LLM_API_KEY
+LLM_API_URL_VAR: VD_CI_LLM_API_URL
+LLM_MODEL_VAR: VD_CI_LLM_MODEL
