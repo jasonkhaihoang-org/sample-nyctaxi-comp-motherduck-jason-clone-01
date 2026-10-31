@@ -27,12 +27,12 @@ def test_ingest_runs_tlc_then_ops_then_mdm_from_the_ingestion_root():
     assert {cwd for _, cwd, _ in runner.calls} == {ROOT / "ingestion"}
 
 
-def test_ingest_environment_points_at_the_repo_database():
+def test_ingest_environment_points_at_the_domain_motherduck_database():
     runner = Recorder()
     run_ingest.run_ingest(runner)
     for _, _, env in runner.calls:
-        assert env["VD_EPHM_DUCKDB_LOCAL_PATH"] == str(ROOT / "domain.duckdb")
-        assert env["VD_DOMAIN_DATA_PLATFORM"] == "duckdb_local"
+        assert env["VD_EPHM_MOTHERDUCK_DATABASE"] == "sa_prd"
+        assert env["VD_DOMAIN_DATA_PLATFORM"] == "motherduck"
         assert env["VD_DOMAIN_SECRET_STORE_KIND"] == "local_toml"
 
 
@@ -42,22 +42,23 @@ def test_ingest_stops_at_the_first_failing_pipeline():
     assert [Path(c[-1]).name for c, _, _ in runner.calls] == ["tlc_pipeline.py", "ops_pipeline.py"]
 
 
-def test_transform_installs_packages_then_builds_against_the_dev_target():
+def test_transform_installs_packages_then_builds_against_the_flight_target():
     runner = Recorder()
     assert run_transform.run_transform(runner) == 0
     (deps, deps_cwd, _), (build, build_cwd, env) = runner.calls
     assert deps[-1] == "deps"
-    assert build[-3:] == ["build", "--target", "dev"]
+    assert build[-3:] == ["build", "--target", "flight"]
     assert deps_cwd == build_cwd == ROOT / "transformation"
-    assert env["VD_EPHM_DUCKDB_LOCAL_PATH"] == str(ROOT / "domain.duckdb")
+    assert env["DESTINATION_DATABASE"] == "sa_prd"
 
 
-def test_ingest_and_transform_write_to_the_database_they_are_given(tmp_path):
-    db = tmp_path / "seed.duckdb"
+def test_ingest_and_transform_write_to_the_database_they_are_given():
     runner = Recorder()
-    run_ingest.run_ingest(runner, db_path=db)
-    run_transform.run_transform(runner, db_path=db)
-    assert {env["VD_EPHM_DUCKDB_LOCAL_PATH"] for _, _, env in runner.calls} == {str(db)}
+    run_ingest.run_ingest(runner, database="sa_dev")
+    run_transform.run_transform(runner, database="sa_dev")
+    ingest, transform = runner.calls[:3], runner.calls[3:]
+    assert {env["VD_EPHM_MOTHERDUCK_DATABASE"] for _, _, env in ingest} == {"sa_dev"}
+    assert {env["DESTINATION_DATABASE"] for _, _, env in transform} == {"sa_dev"}
 
 
 def test_transform_does_not_build_when_package_install_fails():

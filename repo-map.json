@@ -197,7 +197,9 @@
     "case_record": "docs/cases/{intent}.md",
     "logical_model": "logical-model/*.ossie.yaml",
     "ontology": "ontology/{name}.ontology.yaml",
-    "ontology_mapping": "ontology/{document}.mapping.yaml"
+    "ontology_mapping": "ontology/{document}.mapping.yaml",
+    "pipeline_flight": "ingestion/{name}_pipeline.Flight/",
+    "ci_plan": "docs/plans/{intent}.ci-plan.yml"
   },
   "modules": {
     "ingestion": {
@@ -334,5 +336,6 @@
     "reviews_and_proposals": "docs/review/ holds review findings for triage; do not read it for build tasks. Read a docs/proposal/ file only when the intent's requirement links to it.",
     "dbt_sources": "dbt sources name a schema and never a database: the Studio sandbox is a renamed copy of the Domain file, so a catalog name never resolves there. dbt runs use the dev target.",
     "artifact_paths": "Every artifact location is declared here: requirement, plan, verification and case_record per intent, design records per model or pipeline (layered: design_record_model) or area. The plugin names an intent's artifacts; this map places them."
-  }
+  },
+  "data_platform": "motherduck"
 }

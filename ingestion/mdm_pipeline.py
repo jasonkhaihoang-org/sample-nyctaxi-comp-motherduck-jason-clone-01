@@ -1,11 +1,12 @@
 # ingestion/mdm_pipeline.py: loads the master-data platform's reference data into `mdm_raw`.
-# DuckDB-local domain. Run from the ingestion root via orchestration/run_ingest.py.
+# MotherDuck domain. Its Flight is ingestion/mdm_pipeline.Flight/; orchestration/run_ingest.py runs this file in a Studio Intent.
 # Never put credentials or DESTINATION__* config in this file: setup_environment() resolves them.
 import os
 
 import dlt
 from sources.mdm import mdm_source
 from sources.tlc import zone_rows
+from vibedata.dlt.core import dataset
 from vibedata.dlt.duckdb import finalize, setup_environment
 
 # CONNECTION_NAME: the dlt source section [sources.<name>] in .dlt/config.toml.
@@ -27,8 +28,8 @@ def main():
 
     pipeline = dlt.pipeline(
         pipeline_name=PIPELINE_NAME,
-        destination="duckdb",
-        dataset_name="mdm_raw",
+        destination="motherduck",
+        dataset_name=dataset("mdm_raw"),
     )
 
     source = mdm_source.clone(name=CONNECTION_NAME, section=CONNECTION_NAME)(zone_lookup=zone_rows)

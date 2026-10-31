@@ -1,10 +1,11 @@
 # ingestion/tlc_pipeline.py: loads TLC trips and the zone lookup into `bronze`.
-# DuckDB-local domain. Run from the ingestion root via orchestration/run_ingest.py.
+# MotherDuck domain. Its Flight is ingestion/tlc_pipeline.Flight/; orchestration/run_ingest.py runs this file in a Studio Intent.
 # Never put credentials or DESTINATION__* config in this file: setup_environment() resolves them.
 import os
 
 import dlt
 from sources.tlc import tlc_source
+from vibedata.dlt.core import dataset
 from vibedata.dlt.duckdb import finalize, setup_environment
 
 # CONNECTION_NAME: the dlt source section [sources.<name>] in .dlt/config.toml.
@@ -26,8 +27,8 @@ def main():
 
     pipeline = dlt.pipeline(
         pipeline_name=PIPELINE_NAME,
-        destination="duckdb",
-        dataset_name="bronze",
+        destination="motherduck",
+        dataset_name=dataset("bronze"),
     )
 
     source = tlc_source.clone(name=CONNECTION_NAME, section=CONNECTION_NAME)()

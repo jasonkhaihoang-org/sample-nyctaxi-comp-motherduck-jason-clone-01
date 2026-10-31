@@ -1,4 +1,4 @@
-"""Run the dbt project: `dbt deps`, then `dbt build` against the `dev` target, writing domain.duckdb by default."""
+"""Run the dbt project: `dbt deps`, then `dbt build` against the `flight` target, in the Domain's MotherDuck database."""
 
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ def _run(command, cwd, env):
     return subprocess.run(command, cwd=cwd, env=env, check=False)
 
 
-DEFAULT_DB = ROOT / "domain.duckdb"
+DEFAULT_DATABASE = "sa_prd"
 
 
-def run_transform(runner: Callable = _run, target: str = "dev", db_path: Path = DEFAULT_DB) -> int:
+def run_transform(runner: Callable = _run, target: str = "flight", database: str = DEFAULT_DATABASE) -> int:
     env = os.environ.copy()
     env["DBT_PROFILES_DIR"] = str(ROOT / "transformation")
     env["DBT_PROFILE_NAME"] = "nyc_taxi_analytics"
-    # The profile reads the database path from the same variable the Studio sandbox sets.
-    env["VD_EPHM_DUCKDB_LOCAL_PATH"] = str(db_path)
+    # The flight target reads the MotherDuck database from the variable each Flight run sets.
+    env["DESTINATION_DATABASE"] = database
     dbt = [sys.executable, "-m", "dbt.cli.main"]
     # packages.yml installs dbt_project_evaluator; a fresh checkout has no dbt_packages/ until deps runs.
     deps = runner([*dbt, "deps"], cwd=ROOT / "transformation", env=env).returncode

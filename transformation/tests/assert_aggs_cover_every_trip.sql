@@ -6,7 +6,7 @@
 with profile as (
     select 'band' as agg, sum(trip_count) as trips from {{ ref('agg_trip_band_profile') }}
     union all
-    select 'weather', sum(trip_count) from {{ ref('agg_weather_demand_daily') }}
+    select 'weather' as agg, sum(trip_count) as trips from {{ ref('agg_weather_demand_daily') }}
 ),
 
 fact as (
