@@ -2,7 +2,7 @@
 
 Use the `grilling` skill in grill-with-docs mode: whatever the code and documents settle, settle from them.
 
-The inventory is grilled by file and section, the same way as greenfield: each `## ` section of the `AGENTS.md` and convention skill templates is one unit, its recommendation taken from what the inventory found (or the template's recommendation where the code shows nothing). See the `<!-- onboarding -->` blocks in [templates/](../templates/).
+The inventory is grilled by file and section, the same way as greenfield: each `##` section of the `AGENTS.md` and convention skill templates is one unit, its recommendation taken from what the inventory found (or the template's recommendation where the code shows nothing). See the `<!-- onboarding -->` blocks in [templates/](../templates/).
 
 1. Show the inventory as one table and ask the user to confirm or correct it in one pass.
 2. Then ask one question at a time, only for these rows:

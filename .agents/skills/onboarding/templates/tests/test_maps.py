@@ -128,6 +128,27 @@ def test_test_map_paths_exist():
     assert missing == []
 
 
+CI_RULE_KEYS = {"role", "paths", "checks", "all"}
+
+
+def test_test_map_ci_section_is_rules_over_roles():
+    """CI reads only `ci`, never `modules`: each rule names a role or paths, and the checks they run."""
+    ci = TEST_MAP.get("ci")
+    assert ci is not None, "test-map.json has no ci section"
+    assert ci.get("version") == 1 and ci.get("rules"), "the ci section needs version 1 and its rules"
+    for rule in ci["rules"]:
+        assert set(rule) <= CI_RULE_KEYS, f"unknown keys in ci rule {rule}"
+        assert "role" in rule or "paths" in rule, f"ci rule names neither a role nor paths: {rule}"
+        assert isinstance(rule["checks"], list), f"ci rule has no checks list: {rule}"
+
+
+def test_a_ci_rule_with_paths_names_a_folder_role():
+    """A rule's paths sit under its role's folder, so a role a rule narrows must end in `/`."""
+    roles = REPO_MAP["artifact_paths"]
+    narrowed = {rule["role"] for rule in TEST_MAP.get("ci", {}).get("rules", []) if "role" in rule and "paths" in rule}
+    assert [r for r in sorted(narrowed) if r in roles and not roles[r].endswith("/")] == []
+
+
 def test_dbt_sources_name_a_schema_and_never_a_catalog():
     path = ROOT / REPO_MAP["artifact_paths"]["dbt_sources"]
     sources = (yaml.safe_load(path.read_text()) or {}).get("sources") or []

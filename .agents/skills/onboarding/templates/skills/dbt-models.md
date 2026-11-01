@@ -20,7 +20,7 @@ alternatives: as in AGENTS.md
 fills: <raw schemas>, <mart areas>
 -->
 
-- **Bronze**: raw data loaded by the dlt pipelines in `ingestion/` into <raw schemas, one per source system>. dbt reads it as sources and never writes to it.
+- **`Bronze`**: raw data loaded by the dlt pipelines in `ingestion/` into <raw schemas, one per source system>. dbt reads it as sources and never writes to it.
 - **Silver**: dbt `staging` (views) and `intermediate` (tables). Staging renames and casts one source table. Intermediate applies business logic and joins, with no grain commitment of its own.
 - **Gold**: dbt marts in <mart areas, `core` first>: grain-committed facts, conformed dimensions, aggregates.
 
@@ -30,7 +30,7 @@ ask: no
 reason: dlt and the sandbox time zone; the same for every DuckDB-local domain.
 -->
 
-dlt lands naive Arrow timestamps as `TIMESTAMPTZ`, and the session time zone is not always UTC (the sandbox is not). Staging converts every dlt-loaded timestamp with `timezone('UTC', col)`, so later models see the wall-clock value the source recorded. A model that reads bronze without the conversion, or hashes a key from a converted and an unconverted timestamp, matches nothing and stays green.
+dlt lands naive Arrow timestamps as `TIMESTAMPTZ`, and the session time zone is not always UTC (the sandbox is not). `Staging` converts every dlt-loaded timestamp with `timezone('UTC', col)`, so later models see the wall-clock value the source recorded. A model that reads `bronze` without the conversion, or hashes a key from a converted and an unconverted timestamp, matches nothing and stays green.
 
 ## Sources name no database (B18)
 <!-- onboarding
@@ -50,7 +50,7 @@ alternatives: suffixes instead of prefixes; a single underscore in staging names
 
 | Prefix | Layer | Responsibility |
 | --- | --- | --- |
-| `stg_` | staging | One source table: rename and cast only |
+| `stg_` | `staging` | One source table: rename and cast only |
 | `int_` | intermediate | Business logic and joins, no grain commitment |
 | `fct_` | gold | Grain-committed events |
 | `dim_` | gold | Descriptive entities, conformed across facts |
@@ -65,11 +65,11 @@ alternatives: suffixes instead of prefixes; a single underscore in staging names
 <!-- onboarding
 ask: yes
 question: How are properties files organised?
-recommended: One `_<folder>.yml` per folder; unit tests in `_unit_tests.yml` beside the models.
+recommended: One `_<folder>.yml` per folder; unit tests in `_unit_tests.yml` beside the dbt models.
 alternatives: one YAML file per model.
 -->
 
-One YAML file per folder, named `_<folder>.yml`. Unit tests sit in `_unit_tests.yml` beside the models they cover. Generic-test arguments go under `arguments:`.
+One YAML file per folder, named `_<folder>.yml`. Unit tests sit in `_unit_tests.yml` beside the dbt models they cover. Generic-test arguments go under `arguments:`.
 
 ## Columns (B8)
 <!-- onboarding
@@ -85,18 +85,18 @@ List columns explicitly. No `select *` in a mart.
 <!-- onboarding
 ask: yes
 question: Do models carry audit columns?
-recommended: None unless a requirement asks; then gold only, all of `_loaded_at`, `_dbt_invocation_id`, `_git_sha`.
+recommended: None unless a requirement asks; then `gold` only, all of `_loaded_at`, `_dbt_invocation_id`, `_git_sha`.
 alternatives: audit columns on every gold model.
 -->
 
-None unless a requirement asks for them. When one does: gold only, all or none of `_loaded_at`, `_dbt_invocation_id`, `_git_sha`.
+None unless a requirement asks for them. When one does: `gold` only, all or none of `_loaded_at`, `_dbt_invocation_id`, `_git_sha`.
 
 ## Materialisation (B15)
 <!-- onboarding
 ask: yes
 question: How is each layer materialised?
 recommended: Staging views; intermediate tables, or views at the grain of a fact that stores it; gold tables.
-alternatives: intermediate always tables; incremental facts from the start.
+alternatives: `intermediate` always tables; incremental facts from the start.
 -->
 
 | Layer | Default |

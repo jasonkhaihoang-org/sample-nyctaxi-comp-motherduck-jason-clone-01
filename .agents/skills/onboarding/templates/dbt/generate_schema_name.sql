@@ -1,5 +1,5 @@
 {#-
-  Use the model's configured schema verbatim rather than prefixing it with the
+  Use the dbt model's configured schema verbatim rather than prefixing it with the
   target schema. Without this every layer lands as `main_core`, `main_finance`
   and so on, and the warehouse stops resembling the layer diagram in CONTEXT.md.
 -#}

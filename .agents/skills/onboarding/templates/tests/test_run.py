@@ -31,7 +31,7 @@ def test_ingest_environment_points_at_the_repo_database():
     run_ingest.run_ingest(runner)
     for _, _, env in runner.calls:
         assert env["VD_EPHM_DUCKDB_LOCAL_PATH"] == str(ROOT / "domain.duckdb")
-        assert env["VD_DOMAIN_DATA_PLATFORM"] == "duckdb_local"
+        assert env["VD_DOMAIN_DATA_PLATFORM"] == run_ingest.LOCAL_PLATFORM
         assert env["VD_DOMAIN_SECRET_STORE_KIND"] == "local_toml"
 
 

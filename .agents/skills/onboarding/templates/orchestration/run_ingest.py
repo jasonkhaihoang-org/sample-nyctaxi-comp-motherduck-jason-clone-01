@@ -18,13 +18,14 @@ def _run(command, cwd, env):
 
 
 DEFAULT_DB = ROOT / "domain.duckdb"
+LOCAL_PLATFORM = "<local platform>"
 
 
 def ingest_environment(db_path: Path = DEFAULT_DB) -> dict[str, str]:
     """The three variables vibedata's setup_environment() needs on a DuckDB-local domain."""
     env = os.environ.copy()
     env["VD_EPHM_DUCKDB_LOCAL_PATH"] = str(db_path)
-    env["VD_DOMAIN_DATA_PLATFORM"] = "duckdb_local"
+    env["VD_DOMAIN_DATA_PLATFORM"] = LOCAL_PLATFORM
     env["VD_DOMAIN_SECRET_STORE_KIND"] = "local_toml"
     return env
 

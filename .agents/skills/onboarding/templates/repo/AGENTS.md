@@ -78,6 +78,7 @@ ask: no
 reason: The base commands; the same as repo-map.json commands.
 -->
 
+<!-- not-a-runnable-fence: a menu of the base commands, run one at a time -->
 ```bash
 python3 orchestration/run_all.py          # ingestion, then dbt build
 python3 orchestration/run_ingest.py       # dlt pipelines

@@ -1,0 +1,7 @@
+{
+  "GIT_REF": "<approved_ref>",
+  "DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE": "<domain_database>",
+  "DLT_INGEST_LIMIT": "-1",
+  "DEV_MODE": "false",
+  "flight_secret_names": ["<domain_slug>_git_auth", "<connection_secret>"]
+}
