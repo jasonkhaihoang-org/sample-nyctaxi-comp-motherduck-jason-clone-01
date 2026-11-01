@@ -88,7 +88,7 @@
   "notes_for_agents": {
     "startup": "Read this file first. AGENTS.md says how to work; the skills in .agents/skills/ hold the conventions.",
     "new_source": "The first source sets the pattern; every later source mirrors an existing entry in `sources` and creates every artifact it lists. Add it to its runner's `orchestrators.<name>.runs` and to that runner's own code. When two sources share a `dataset`, each also declares `produces` (the tables it lands). Add it to `test-map.json` only when it needs its own test module.",
-    "dlt_environment": "Pipelines need VD_DOMAIN_DATA_PLATFORM=duckdb_local, VD_DOMAIN_SECRET_STORE_KIND=local_toml and VD_EPHM_DUCKDB_LOCAL_PATH; orchestration/run_ingest.py sets them.",
+    "dlt_environment": "Pipelines run locally need VD_DOMAIN_DATA_PLATFORM, VD_DOMAIN_SECRET_STORE_KIND and VD_EPHM_DUCKDB_LOCAL_PATH; orchestration/run_ingest.py sets all three.",
     "dbt_sources": "dbt sources name a schema and never a database: the Studio sandbox is a renamed copy of the Domain file. dbt runs use the dev target.",
     "artifact_paths": "Every artifact location is declared here: requirement, plan, verification and case_record per intent, design records per model or pipeline (layered: design_record_model) or area. The plugin names an intent's artifacts; this map places them.",
     "reviews_and_proposals": "docs/review/ holds review findings for triage; do not read it for build tasks. Read a docs/proposal/ file only when the intent's requirement links to it."

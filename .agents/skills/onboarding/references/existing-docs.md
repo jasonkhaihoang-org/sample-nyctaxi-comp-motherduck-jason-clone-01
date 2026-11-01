@@ -14,6 +14,9 @@
 | Per-pipeline docs or runbooks | Pipeline design | `docs/design/pipelines/` |
 | Cross-model or subject-area design docs | Area design | `docs/design/<area>/` |
 | Incident write-ups and root-cause analyses | Case record | `docs/cases/` |
+
+| Found | What onboarding does |
+| --- | --- |
 | `CLAUDE.md`, `.cursor/rules`, `.github/copilot-instructions.md` or similar | Mine their conventions into the inventory. Once the convention skills hold them, reduce the file to one line pointing at `AGENTS.md`. |
 | An existing `AGENTS.md` | Rewrite it as the index. Every convention it held lands in a convention skill; the PR description lists where each went. |
 | dbt YAML descriptions and doc blocks | Leave them. Take `CONTEXT.md` terms from them. |

@@ -318,9 +318,39 @@
     },
     "artifact_paths": {
       "type": "object",
-      "description": "Role to path. {placeholders} stand for names; skills resolve them.",
+      "description": "Role to path. {placeholders} stand for names; skills resolve them. A path ending in / is a folder. CI finds the repo's layout through the roles it requires, so every one is declared; a folder role ends in /.",
       "additionalProperties": {
         "type": "string"
+      },
+      "required": [
+        "dbt_project",
+        "ingestion_root",
+        "pipeline",
+        "source_config",
+        "orchestration",
+        "test_map"
+      ],
+      "properties": {
+        "dbt_project": {
+          "type": "string",
+          "pattern": "/$"
+        },
+        "ingestion_root": {
+          "type": "string",
+          "pattern": "/$"
+        },
+        "orchestration": {
+          "type": "string",
+          "pattern": "/$"
+        },
+        "pipeline_flight": {
+          "type": "string",
+          "pattern": "/$"
+        },
+        "pipeline": {
+          "type": "string",
+          "pattern": "\\{name\\}"
+        }
       }
     },
     "modules": {

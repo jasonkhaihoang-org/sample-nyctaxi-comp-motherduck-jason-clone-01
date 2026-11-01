@@ -66,7 +66,7 @@ recommended: When a branch could be wrong: ordering and tie-breaks, deduplicatio
 alternatives: every intermediate model.
 -->
 
-A model needs a unit test when its logic has a branch a reviewer could get wrong: ordering and tie-breaks, deduplication, and state classification. Unit tests live in `_unit_tests.yml` beside the model.
+A model needs a unit test when its logic has a branch a reviewer could get wrong: ordering and tie-breaks, deduplication, and state classification. Unit tests live in `_unit_tests.yml` beside the dbt model.
 
 Run data tests and unit tests as separate commands. The command for each layer is in `test-map.json`.
 

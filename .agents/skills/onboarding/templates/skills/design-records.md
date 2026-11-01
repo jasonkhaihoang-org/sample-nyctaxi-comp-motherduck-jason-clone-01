@@ -32,4 +32,4 @@ A design record holds decisions, not measurements. Counts, profiling results, re
 
 ## Areas
 
-A decision shared by several models is recorded once, in an area design at `docs/design/<area>/<subject>.md` (for example `docs/design/orders/order-identity.md`), and each model's record cites it. An area is never named `models` or `pipelines`.
+A decision shared by several models is recorded once, in an area design at `docs/design/<area>/<subject>.md` (for example `docs/design/<area>/order-identity.md`, area `orders`), and each model's record cites it. An area is never named `models` or `pipelines`.

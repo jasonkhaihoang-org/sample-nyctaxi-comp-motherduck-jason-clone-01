@@ -2,7 +2,7 @@
 
 One row per convention the repo follows. Build it from the code and documents before asking anything.
 
-Record whether `logical-model/` exists. A repo with gold marts and no canonical model is a review finding, and writing the model is part of Build once the marts are stable enough to describe.
+Record whether `logical-model/` exists. A repo with gold marts and no Ossie document is a review finding, and writing the Ossie documents is part of Build once the marts are stable enough to describe.
 
 | Column | Content |
 | --- | --- |
@@ -29,7 +29,7 @@ Read the models, macros, seeds and pipeline config for **numbers and predicates 
 - predicates that change a population: `where is_billable`, a report window, `is_current_version`, an inner join that drops unmatched rows;
 - a `--` comment that explains **why** a rule exists rather than what the code does. That comment is often the only surviving record of a decision that was made in a conversation.
 
-Inventory each one, then apply the destination test: a standing business answer — a threshold, a population definition, a measure definition, a grain — is an `ADR`, which the [`adr`](../../adr/SKILL.md) skill already says qualifies. A rule still undecided, or one whose only rationale is the code itself, is a `review` finding.
+Inventory each one, then apply the destination test: a standing business answer — a threshold, a population definition, a measure definition, a grain — is an `ADR`, which the Domain's `adr` convention skill (from [`templates/skills/adr.md`](../templates/skills/adr.md)) already says qualifies. A rule still undecided, or one whose only rationale is the code itself, is a `review` finding.
 
 A hard-coded number whose reason lives only in a comment is the classic miss. It governs what every consumer sees, no document states it, and the next model binds to it as though it were a law of nature. The origin-destination matrix's 25-trip floor sat that way: `having count(*) >= 25` with a two-line comment, no ADR, until an intent had to write one.
 

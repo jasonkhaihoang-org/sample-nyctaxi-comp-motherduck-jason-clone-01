@@ -2,7 +2,7 @@
 
 A domain skill is a multi-step procedure this repo has and no plugin skill covers. It is the one kind of skill in `.agents/skills/` that is a procedure; the others are convention skills (a must or never that holds for every change of a kind), written from `templates/skills/`. Example: "add a reporting month": change the config months, run ingestion, rebuild an incremental fact with `--full-refresh`.
 
-Never a candidate: adding or changing a source, pipeline, model or test. Plugin skills cover those; what is specific to this repo becomes a convention skill. The canonical semantic model is the exception in the other direction: its shape is a convention skill (`semantic-model` and `validating-semantic-model`), seeded rather than discovered, because every repo models the lakehouse the same way and the model is not a procedure.
+Never a candidate: adding or changing a source, pipeline, model or test. Plugin skills cover those; what is specific to this repo becomes a convention skill. The canonical semantic model is the exception in the other direction: its shape is a convention skill (`semantic-model` and `validating-semantic-model`), seeded rather than discovered, because every repo models the lakehouse the same way and the semantic layer is not a procedure.
 
 ## Finding candidates
 

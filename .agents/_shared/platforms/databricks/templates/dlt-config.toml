@@ -1,0 +1,5 @@
+[schema]
+naming = "direct"
+
+[destination.databricks]
+keep_staged_files = false

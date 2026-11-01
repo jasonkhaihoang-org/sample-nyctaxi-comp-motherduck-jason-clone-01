@@ -15,4 +15,4 @@ For each, using only `AGENTS.md`, `repo-map.json` and `.agents/skills/`, write d
 
 Then check every entry against the repo: the paths exist, the command runs in the sandbox, and nothing the task needs is missing from the context. Do not run a build.
 
-Each miss is a context fix before shipping, or a finding in the review. Record the table and its result in this intent's `verify.md`, not under `docs/review/`.
+Each miss is a context fix before shipping, or a finding in the review. Record the table and its result in this intent's Verification, not under `docs/review/`.
