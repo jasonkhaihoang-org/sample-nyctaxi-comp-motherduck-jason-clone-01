@@ -8,20 +8,29 @@ set in the right shape.
 It does not judge meaning. Whether a mapping is honest, whether every field is
 supplied, whether an aggregate computes the same aggregation, and whether a
 table's population matches the star's are content questions, reviewed by the
-agent against the mart SQL (see `SKILL.md` and `references/`).
+agent against the mart SQL (the validating-semantic-model skill).
 
 Pure functions: input is the parsed YAML dict, output is a list of diagnostics.
 """
 
 import json
 import re
+from pathlib import Path
 
+import ossie_functions
 import ossie_sql
+from jsonschema import Draft202012Validator
 from ossie_sql import ExpressionError
 
 VENDOR = "VIBEDATA"
 
+# The current key-set generation; vibedata-schema.json's $defs/version holds the same value.
+VIBEDATA_VERSION = "1.6"
+# 1.6 only adds `conformed_from`, so a document wholly on 1.5 stays valid.
+ACCEPTED_VERSIONS = ("1.5", VIBEDATA_VERSION)
+SCHEMA_PATH = Path(__file__).parent / "vibedata-schema.json"
 CARDINALITIES = {"many-to-one", "one-to-one", "many-to-many"}
+JOIN_TYPES = {"LEFT OUTER", "INNER", "FULL OUTER", "RIGHT OUTER"}
 AGGREGATIONS = {"SUM", "MIN", "MAX", "NON_ADDITIVE"}
 TIME_SERIES_FUNCTIONS = {"AGO", "TODATE", "ROLLING"}
 UNRELATED = {"error", "total"}
@@ -32,7 +41,7 @@ COMPUTED_KEYS = ("derived_expression", "at_levels", "time_series", "based_on_dim
 
 MODEL_KEYS = {"vibedata_version", "physical_tables", "physical_joins"}
 DATASET_KEYS = {"vibedata_version", "scd", "logical_sources", "levels", "row_level",
-                "hierarchies"}
+                "hierarchies", "conformed_from"}
 RELATIONSHIP_KEYS = {"vibedata_version", "physical_join", "cardinality",
                      "join_type", "join_cost", "join_expression", "note", "to_level",
                      "weight"}
@@ -348,6 +357,11 @@ def validate_vibedata(doc):
         detail = ", ".join(f"{w}={v!r}" for v, w in versions)
         diags.append(_error("vibedata/version-mismatch",
                             f"model '{model_name}': mixed vibedata_version: {detail}"))
+    elif versions and versions[0][0] not in ACCEPTED_VERSIONS:
+        diags.append(_error("vibedata/version-unsupported",
+                            f"model '{model_name}': vibedata_version {versions[0][0]!r} is "
+                            f"not the current key set {VIBEDATA_VERSION!r} (1.5 is also accepted); upgrade every "
+                            "payload (S6a)"))
 
     model_payload, errs = _model_payload(doc)
     diags.extend(errs)
@@ -431,6 +445,8 @@ def validate_vibedata(doc):
         diags.extend(_validate_level_join(rel, doc, context))
         diags.extend(_validate_from_columns(rel, doc))
         diags.extend(_validate_to_columns(rel, doc))
+    diags.extend(_schema_constraints(doc))
+    diags.extend(_expression_checks(doc))
     return diags
 
 
@@ -468,6 +484,10 @@ def _validate_dataset(dataset, context):
     for p in payloads:
         payload.update(p)
     diags.extend(_unknown_keys(payload, DATASET_KEYS, where))
+    if payload.get("conformed_from") is not None and payload.get("vibedata_version") == "1.5":
+        diags.append(_error("vibedata/version-mismatch",
+                            f"{where}: `conformed_from` is a 1.6 key but the payload is "
+                            "vibedata_version '1.5'; stamp the whole document 1.6 (S6a)"))
 
     level_names = []
     for level in payload.get("levels", []) or []:
@@ -1174,6 +1194,11 @@ def _validate_relationship(rel, dataset_names, physical_join_names, doc):
             diags.append(_error("vibedata/bad-cardinality",
                                 f"{where}: cardinality '{cardinality}' must be one of "
                                 f"{sorted(CARDINALITIES)}"))
+        join_type = payload.get("join_type")
+        if join_type is not None and join_type not in JOIN_TYPES:
+            diags.append(_error("vibedata/bad-join-type",
+                                f"{where}: join_type {join_type!r} must be one of "
+                                f"{sorted(JOIN_TYPES)}"))
     return diags
 
 
@@ -1210,4 +1235,166 @@ def _validate_from_columns(rel, doc):
             diags.append(_error("relationship/from-column-unknown",
                                 f"relationship '{rel_name}': from_column '{column}' is not "
                                 f"a declared field of dataset '{rel.get('from')}'"))
+    return diags
+
+
+# -- schema constraints ---------------------------------------------------------
+#
+# The checks above own keys, shapes, enums and references. vibedata-schema.json also
+# constrains values (an identifier, a schema.table relation, an ISO date, a non-empty
+# note); those are reported here, one code per JSON Schema keyword, and nothing the
+# checks above already report is repeated.
+
+SCHEMA_KEYWORDS = {"pattern", "anyOf", "minLength", "maxLength"}
+PAYLOAD_DEFS = {"model": "modelPayload", "dataset": "datasetPayload",
+                "relationship": "relationshipPayload", "metric": "metricPayload"}
+_VALIDATORS = {}
+
+
+def _payload_validator(component):
+    if not _VALIDATORS:
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        for name, ref in PAYLOAD_DEFS.items():
+            _VALIDATORS[name] = Draft202012Validator(
+                {"$ref": f"#/$defs/{ref}", "$defs": schema["$defs"]})
+    return _VALIDATORS[component]
+
+
+def _component_payloads(doc):
+    """(component, where, payload) for every decodable VIBEDATA payload in `doc`."""
+    nodes = [("model", "model", doc)]
+    for key, component in (("datasets", "dataset"), ("relationships", "relationship"),
+                           ("metrics", "metric")):
+        for node in doc.get(key) or []:
+            if isinstance(node, dict):
+                nodes.append((component, f"{component} '{node.get('name', '<unnamed>')}'",
+                              node))
+    for component, where, node in nodes:
+        for data in _extensions(node):
+            try:
+                payload = json.loads(data)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(payload, dict):
+                yield component, where, payload
+
+
+def _schema_constraints(doc):
+    diags = []
+    for component, where, payload in _component_payloads(doc):
+        for err in _payload_validator(component).iter_errors(payload):
+            if err.validator not in SCHEMA_KEYWORDS:
+                continue
+            path = ".".join(str(p) for p in err.absolute_path) or "(payload)"
+            what = ("is not an Ossie SQL identifier" if err.validator == "anyOf"
+                    else err.message)
+            diags.append(_error(f"vibedata/schema-{err.validator.lower()}",
+                                f"{where}: {path}: {err.instance!r} {what}"
+                                if err.validator == "anyOf" else f"{where}: {path}: {what}"))
+    return diags
+
+
+# -- expression kinds and Ossie core conformance ------------------------------------
+
+ANSI_DIALECTS = ("ANSI_SQL", "OSSIE_SQL_2026")
+
+
+def _core_expressions(node):
+    """The ANSI/Ossie-dialect expression texts of a field or metric."""
+    for dialect in ((node.get("expression") or {}).get("dialects") or []):
+        if isinstance(dialect, dict) and dialect.get("dialect") in ANSI_DIALECTS \
+                and isinstance(dialect.get("expression"), str):
+            yield dialect["expression"]
+
+
+def _parsed(text):
+    try:
+        return ossie_sql.parse(text)
+    except ExpressionError:
+        return None  # a parse failure is reported where the expression is first checked
+
+
+def _unlisted(node, where):
+    names = ossie_functions.unlisted(node)
+    if not names:
+        return []
+    return [{"severity": "warning", "code": "ossie/function-unlisted",
+             "message": f"{where}: {', '.join(names)} is not in Ossie's REQUIRED or "
+                        "RECOMMENDED function list, so the expression may not port"}]
+
+
+def _kind(text, kind, code, where):
+    if not isinstance(text, str) or _parsed(text) is None:
+        return []
+    reason = ossie_sql.check_kind(text, kind)
+    diags = [_error(code, f"{where}: {reason}")] if reason else []
+    return diags + _unlisted(_parsed(text), where)
+
+
+def _expression_checks(doc):
+    """Each expression is the kind its place needs; Ossie core's own aggregation rules."""
+    diags = []
+    for dataset in doc.get("datasets") or []:
+        if not isinstance(dataset, dict):
+            continue
+        name = dataset.get("name", "<unnamed>")
+        for field in dataset.get("fields") or []:
+            if not isinstance(field, dict):
+                continue
+            where = f"field '{name}.{field.get('name')}'"
+            for text in _core_expressions(field):
+                node = _parsed(text)
+                if node is None:
+                    continue
+                if ossie_sql.has_aggregate(node):
+                    diags.append(_error("ossie/field-aggregate",
+                                        f"{where}: a field expression aggregates; an "
+                                        "aggregate is a metric"))
+                diags.extend(_unlisted(node, where))
+        for data in _extensions(dataset):
+            try:
+                payload = json.loads(data)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            for src in (payload.get("logical_sources") or []) if isinstance(payload, dict) else []:
+                if isinstance(src, dict) and src.get("content_filter") is not None:
+                    diags.extend(_kind(src["content_filter"], ossie_sql.PREDICATE,
+                                       "vibedata/content-filter-kind",
+                                       f"{name}.{src.get('name')} content_filter"))
+    for metric in doc.get("metrics") or []:
+        if not isinstance(metric, dict):
+            continue
+        where = f"metric '{metric.get('name')}'"
+        for text in _core_expressions(metric):
+            node = _parsed(text)
+            if node is None:
+                continue
+            if not ossie_sql.has_aggregate(node):
+                diags.append(_error("ossie/metric-not-aggregate",
+                                    f"{where}: a metric expression aggregates rows; this "
+                                    "one has no aggregate function"))
+            diags.extend(_unlisted(node, where))
+        for data in _extensions(metric):
+            try:
+                payload = json.loads(data)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("derived_expression") is not None:
+                diags.extend(_kind(payload["derived_expression"], ossie_sql.METRIC_FORMULA,
+                                   "vibedata/derived-kind", f"{where} derived_expression"))
+            if payload.get("filter") is not None:
+                diags.extend(_kind(payload["filter"], ossie_sql.PREDICATE,
+                                   "vibedata/filter-kind", f"{where} filter"))
+    for rel in doc.get("relationships") or []:
+        for data in _extensions(rel):
+            try:
+                payload = json.loads(data)
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(payload, dict) and payload.get("join_expression") is not None:
+                diags.extend(_kind(payload["join_expression"], ossie_sql.PREDICATE,
+                                   "vibedata/join-expression-kind",
+                                   f"relationship '{rel.get('name')}' join_expression"))
     return diags

@@ -5,7 +5,7 @@ datasets:
   - name: orders
     source: core.fct_order
     primary_key: [order_key]
-    description: One row per order.
+    description: Customer orders.
     fields:
       - name: order_key
         expression:
@@ -41,11 +41,11 @@ datasets:
         datatype: Decimal
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "logical_sources": [{"name": "LTS1_detail", "physical_table": "fct_order", "priority_group": 1, "content_grain": ["order"], "column_map": {"order_key": "order_key", "order_date": "order_date", "customer_key": "customer_key", "ship_to_customer_key": "ship_to_customer_key", "amount": "amount", "order_count": "order_key", "order_revenue": "amount"}}, {"name": "LTS2_daily", "physical_table": "agg_order_daily", "priority_group": 0, "content_grain": ["order_date"], "note": "order_count checked against agg_order_daily.sql: count(*) over the window; the inner join to dim_customer drops null customer keys, so the filter says so. content_filter held by assert_order_daily_matches_its_content_filter", "column_map": {"order_date": "order_date", "order_count": "order_count"}, "content_levels": [{"via": "orders_to_date", "level": "day", "key_columns": ["order_date"]}], "content_filter": "order_date >= DATE ''2024-01-01'' AND customer_key IS NOT NULL"}, {"name": "LTS3_monthly", "physical_table": "agg_order_monthly", "priority_group": 0, "content_grain": ["order_month"], "content_levels": [{"via": "orders_to_date", "level": "month", "key_columns": ["order_month"]}], "note": "Joins dim_month, the date dimension''s month-grain table, at the month key. No row filter: every order is rolled up. Binding held by assert_semantic_content_holds.", "column_map": {"order_count": "order_count", "order_revenue": "order_revenue"}}]}'
+        data: '{"vibedata_version": "1.6", "logical_sources": [{"name": "LTS1_detail", "physical_table": "fct_order", "priority_group": 1, "content_grain": ["order"], "column_map": {"order_key": "order_key", "order_date": "order_date", "customer_key": "customer_key", "ship_to_customer_key": "ship_to_customer_key", "amount": "amount", "order_count": "order_key", "order_revenue": "amount"}}, {"name": "LTS2_daily", "physical_table": "agg_order_daily", "priority_group": 0, "content_grain": ["order_date"], "note": "order_count checked against agg_order_daily.sql: count(*) over the window; the inner join to dim_customer drops null customer keys, so the filter says so. content_filter held by assert_semantic_content_holds.", "column_map": {"order_date": "order_date", "order_count": "order_count"}, "content_levels": [{"via": "orders_to_date", "level": "day", "key_columns": ["order_date"]}], "content_filter": "order_date >= DATE ''2024-01-01'' AND customer_key IS NOT NULL"}, {"name": "LTS3_monthly", "physical_table": "agg_order_monthly", "priority_group": 0, "content_grain": ["order_month"], "content_levels": [{"via": "orders_to_date", "level": "month", "key_columns": ["order_month"]}], "note": "Joins dim_month, the date dimension''s month-grain table, at the month key. No row filter: every order is rolled up. Binding held by assert_semantic_content_holds.", "column_map": {"order_count": "order_count", "order_revenue": "order_revenue"}}]}'
   - name: customer
     source: core.dim_customer
     primary_key: [customer_key]
-    description: "One row per customer. Role-playing: reached as buyer and as ship-to."
+    description: "Customers. Role-playing: reached as buyer and as ship-to."
     fields:
       - name: customer_key
         expression:
@@ -61,12 +61,12 @@ datasets:
         datatype: String
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "logical_sources": [{"name": "LTS1_base", "physical_table": "dim_customer", "priority_group": 1, "content_grain": ["customer"], "column_map": {"customer_key": "customer_key", "customer_name": "customer_name"}}]}'
+        data: '{"vibedata_version": "1.6", "logical_sources": [{"name": "LTS1_base", "physical_table": "dim_customer", "priority_group": 1, "content_grain": ["customer"], "column_map": {"customer_key": "customer_key", "customer_name": "customer_name"}}]}'
   - name: date
     source: core.dim_date
     primary_key:
       - calendar_date
-    description: One row per calendar day.
+    description: Calendar days.
     fields:
       - name: calendar_date
         expression:
@@ -94,7 +94,7 @@ datasets:
         datatype: String
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "logical_sources": [{"name": "LTS1_calendar", "physical_table": "dim_date", "priority_group": 1, "content_grain": ["calendar_date"], "column_map": {"calendar_date": "calendar_date", "calendar_year": "calendar_year", "month_start_date": "month_start_date", "month_name": "month_name"}}, {"name": "LTS2_month_table", "physical_table": "dim_month", "priority_group": 0, "content_grain": ["month_start_date"], "content_levels": [{"level": "month", "key_columns": ["month_start_date"]}], "note": "The month-grain calendar table: one row per month. It supplies the month level and everything above it, never a day", "column_map": {"month_start_date": "month_start_date", "month_name": "month_name", "calendar_year": "calendar_year"}}], "levels": [{"name": "year", "keys": [{"name": "calendar_year", "fields": ["calendar_year"], "primary": true, "display": true}]}, {"name": "month", "keys": [{"name": "month_start_date", "fields": ["month_start_date"], "primary": true, "display": true}], "attributes": ["month_name"]}, {"name": "day", "keys": [{"name": "calendar_date", "fields": ["calendar_date"], "primary": true, "display": true}]}], "row_level": {"level": "day", "versioned": false}, "hierarchies": [{"name": "Time", "is_time": true, "levels": ["year", "month", "day"]}]}'
+        data: '{"vibedata_version": "1.6", "logical_sources": [{"name": "LTS1_calendar", "physical_table": "dim_date", "priority_group": 1, "content_grain": ["calendar_date"], "column_map": {"calendar_date": "calendar_date", "calendar_year": "calendar_year", "month_start_date": "month_start_date", "month_name": "month_name"}}, {"name": "LTS2_month_table", "physical_table": "dim_month", "priority_group": 0, "content_grain": ["month_start_date"], "content_levels": [{"level": "month", "key_columns": ["month_start_date"]}], "note": "The month-grain calendar table: one row per month. It supplies the month level and everything above it, never a day", "column_map": {"month_start_date": "month_start_date", "month_name": "month_name", "calendar_year": "calendar_year"}}], "levels": [{"name": "year", "keys": [{"name": "calendar_year", "fields": ["calendar_year"], "primary": true, "display": true}]}, {"name": "month", "keys": [{"name": "month_start_date", "fields": ["month_start_date"], "primary": true, "display": true}], "attributes": ["month_name"]}, {"name": "day", "keys": [{"name": "calendar_date", "fields": ["calendar_date"], "primary": true, "display": true}]}], "row_level": {"level": "day", "versioned": false}, "hierarchies": [{"name": "Time", "is_time": true, "levels": ["year", "month", "day"]}]}'
 relationships:
   - name: orders_to_customer
     from: orders
@@ -103,7 +103,7 @@ relationships:
     to_columns: [customer_key]
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "physical_join": "fct_order_to_dim_customer", "cardinality": "many-to-one", "join_type": "LEFT OUTER"}'
+        data: '{"vibedata_version": "1.6", "physical_join": "fct_order_to_dim_customer", "cardinality": "many-to-one", "join_type": "LEFT OUTER"}'
   - name: orders_to_ship_to_customer
     from: orders
     to: customer
@@ -111,7 +111,7 @@ relationships:
     to_columns: [customer_key]
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "physical_join": "fct_order_to_ShipTo_Customer", "cardinality": "many-to-one", "join_type": "LEFT OUTER"}'
+        data: '{"vibedata_version": "1.6", "physical_join": "fct_order_to_ShipTo_Customer", "cardinality": "many-to-one", "join_type": "LEFT OUTER"}'
   - name: orders_to_date
     from: orders
     to: date
@@ -121,7 +121,7 @@ relationships:
       - calendar_date
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "physical_join": "fct_order_to_dim_date", "cardinality": "many-to-one", "join_type": "LEFT OUTER"}'
+        data: '{"vibedata_version": "1.6", "physical_join": "fct_order_to_dim_date", "cardinality": "many-to-one", "join_type": "LEFT OUTER"}'
 metrics:
   - name: order_count
     expression:
@@ -131,7 +131,7 @@ metrics:
     datatype: Integer
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "aggregation": "SUM"}'
+        data: '{"vibedata_version": "1.6", "aggregation": "SUM"}'
   - name: order_revenue
     expression:
       dialects:
@@ -140,7 +140,7 @@ metrics:
     datatype: Decimal
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "aggregation": "SUM"}'
+        data: '{"vibedata_version": "1.6", "aggregation": "SUM"}'
   - name: average_order_value
     expression:
       dialects:
@@ -149,7 +149,7 @@ metrics:
     datatype: Decimal
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "derived_expression": "order_revenue * 1.0 / NULLIF(order_count, 0)"}'
+        data: '{"vibedata_version": "1.6", "derived_expression": "order_revenue * 1.0 / NULLIF(order_count, 0)"}'
   - name: avg_daily_order_revenue
     expression:
       dialects:
@@ -158,8 +158,8 @@ metrics:
     datatype: Decimal
     custom_extensions:
       - vendor_name: VIBEDATA
-        data: '{"vibedata_version": "1.5", "based_on_dimensions": {"of": "order_revenue", "across": [{"via": "orders_to_date", "level": "day"}], "rule": "AVG"}}'
+        data: '{"vibedata_version": "1.6", "based_on_dimensions": {"of": "order_revenue", "across": [{"via": "orders_to_date", "level": "day"}], "rule": "AVG"}}'
     description: Order revenue summed per order day, then averaged over the days with orders (a dimension-based aggregation rule, AVG across Time at day).
 custom_extensions:
   - vendor_name: VIBEDATA
-    data: '{"vibedata_version": "1.5", "physical_tables": [{"name": "fct_order", "source": "core.fct_order", "dbt_model": "fct_order", "table_type": "TABLE"}, {"name": "dim_customer", "source": "core.dim_customer", "dbt_model": "dim_customer", "table_type": "TABLE"}, {"name": "ShipTo_Customer", "source": "core.dim_customer", "dbt_model": "dim_customer", "table_type": "ALIAS", "alias_of": "dim_customer", "role": "ship-to customer"}, {"name": "agg_order_daily", "source": "agg.agg_order_daily", "dbt_model": "agg_order_daily", "table_type": "TABLE"}, {"name": "dim_date", "source": "core.dim_date", "dbt_model": "dim_date", "table_type": "TABLE"}, {"name": "dim_month", "source": "core.dim_month", "dbt_model": "dim_month", "table_type": "TABLE"}, {"name": "agg_order_monthly", "source": "agg.agg_order_monthly", "dbt_model": "agg_order_monthly", "table_type": "TABLE"}], "physical_joins": [{"name": "fct_order_to_dim_customer", "from": "fct_order", "to": "dim_customer"}, {"name": "fct_order_to_ShipTo_Customer", "from": "fct_order", "to": "ShipTo_Customer"}, {"name": "agg_order_daily_to_dim_customer", "from": "agg_order_daily", "to": "dim_customer"}, {"name": "fct_order_to_dim_date", "from": "fct_order", "to": "dim_date"}, {"name": "agg_order_daily_to_dim_date", "from": "agg_order_daily", "to": "dim_date"}, {"name": "agg_order_monthly_to_dim_month", "from": "agg_order_monthly", "to": "dim_month"}]}'
+    data: '{"vibedata_version": "1.6", "physical_tables": [{"name": "fct_order", "source": "core.fct_order", "dbt_model": "fct_order", "table_type": "TABLE"}, {"name": "dim_customer", "source": "core.dim_customer", "dbt_model": "dim_customer", "table_type": "TABLE"}, {"name": "ShipTo_Customer", "source": "core.dim_customer", "dbt_model": "dim_customer", "table_type": "ALIAS", "alias_of": "dim_customer", "role": "ship-to customer"}, {"name": "agg_order_daily", "source": "agg.agg_order_daily", "dbt_model": "agg_order_daily", "table_type": "TABLE"}, {"name": "dim_date", "source": "core.dim_date", "dbt_model": "dim_date", "table_type": "TABLE"}, {"name": "dim_month", "source": "core.dim_month", "dbt_model": "dim_month", "table_type": "TABLE"}, {"name": "agg_order_monthly", "source": "agg.agg_order_monthly", "dbt_model": "agg_order_monthly", "table_type": "TABLE"}], "physical_joins": [{"name": "fct_order_to_dim_customer", "from": "fct_order", "to": "dim_customer"}, {"name": "fct_order_to_ShipTo_Customer", "from": "fct_order", "to": "ShipTo_Customer"}, {"name": "agg_order_daily_to_dim_customer", "from": "agg_order_daily", "to": "dim_customer"}, {"name": "fct_order_to_dim_date", "from": "fct_order", "to": "dim_date"}, {"name": "agg_order_daily_to_dim_date", "from": "agg_order_daily", "to": "dim_date"}, {"name": "agg_order_monthly_to_dim_month", "from": "agg_order_monthly", "to": "dim_month"}]}'

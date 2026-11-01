@@ -130,8 +130,7 @@ def test_compile_cli_prints_source_and_sql(tmp_path):
 
 
 def test_content_tests_are_current():
-    result = RUNNER.invoke(app, ["content-tests", "logical-model",
-                                 "transformation/tests/assert_semantic_content_holds.sql", "--check"])
+    result = RUNNER.invoke(app, ["generate-tests", "logical-model", "transformation/tests", "--check"])
     assert result.exit_code == 0, result.stdout
 
 
