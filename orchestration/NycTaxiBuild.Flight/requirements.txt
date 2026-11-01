@@ -50,7 +50,7 @@ dbt-protos==1.0.615
     #   dbt-core
 deepdiff==8.6.2
     # via dbt-common
-duckdb==2.0.0
+duckdb==1.5.6
     # via
     #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
     #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dbt.in
