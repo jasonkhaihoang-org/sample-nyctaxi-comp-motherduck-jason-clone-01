@@ -190,5 +190,101 @@
         "structural": "python3 .agents/skills/semantic-model/scripts/ossie.py validate ontology/ && python3 .agents/skills/semantic-model/scripts/ossie.py refs ontology/ logical-model/ && python3 .agents/skills/semantic-model/scripts/ossie.py glossary ontology/ CONTEXT.md"
       }
     }
+  },
+  "ci": {
+    "version": 1,
+    "rules": [
+      {
+        "role": "dbt_project",
+        "checks": [
+          "dbt-gate"
+        ]
+      },
+      {
+        "role": "dbt_project",
+        "paths": [
+          "dbt_project.yml",
+          "packages.yml"
+        ],
+        "checks": [
+          "dbt-gate"
+        ],
+        "all": true
+      },
+      {
+        "role": "ingestion_root",
+        "checks": [
+          "dlt-gate"
+        ]
+      },
+      {
+        "role": "pipeline_flight",
+        "checks": [
+          "dlt-gate"
+        ]
+      },
+      {
+        "role": "source_config",
+        "checks": [
+          "dlt-gate"
+        ],
+        "all": true
+      },
+      {
+        "role": "ingestion_root",
+        "paths": [
+          "requirements.txt"
+        ],
+        "checks": [
+          "dlt-gate"
+        ],
+        "all": true
+      },
+      {
+        "role": "orchestration",
+        "checks": [
+          "orchestration-static"
+        ]
+      },
+      {
+        "role": "ci_plan",
+        "checks": []
+      },
+      {
+        "role": "test_map",
+        "checks": []
+      },
+      {
+        "role": "resource_docs",
+        "checks": []
+      },
+      {
+        "role": "ingestion_root",
+        "paths": [
+          "last-run-preview.md"
+        ],
+        "checks": []
+      },
+      {
+        "paths": [
+          "docs/**",
+          "intent/**",
+          ".agents/**",
+          ".github/**",
+          ".workflow/**",
+          "repo-map.json",
+          "repo-map.schema.json",
+          "test-map.schema.json",
+          ".pre-commit-config.yaml",
+          "requirements-dev.txt",
+          "*.md",
+          ".gitignore",
+          ".gitattributes",
+          ".githooks/**",
+          "creds.example"
+        ],
+        "checks": []
+      }
+    ]
   }
 }
