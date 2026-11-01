@@ -1,0 +1,9 @@
+{
+  "GIT_REF": "main",
+  "DESTINATION__MOTHERDUCK__CREDENTIALS__DATABASE": "sa_prd",
+  "DLT_INGEST_LIMIT": "-1",
+  "DEV_MODE": "false",
+  "flight_secret_names": [
+    "nyc_taxi_motherduck_demo_git_auth"
+  ]
+}

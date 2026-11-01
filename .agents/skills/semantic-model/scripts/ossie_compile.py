@@ -204,7 +204,7 @@ def _assemble(select, relation, alias, joins, where, grouped):
     lines = ["select", "    " + ",\n    ".join(select), f"from {relation} as {alias}"]
     lines += joins
     if where:
-        lines.append("where " + "\n    and ".join(where))
+        lines.append("where " + "\n    and ".join(ossie_sql.grouped(term) for term in where))
     if grouped:
         lines.append("group by " + ", ".join(str(i + 1) for i in range(grouped)))
     return "\n".join(lines)

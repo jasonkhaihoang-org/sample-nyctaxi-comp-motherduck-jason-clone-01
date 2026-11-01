@@ -1,0 +1,108 @@
+certifi==2026.10.23
+    # via requests
+charset-normalizer==3.5.2
+    # via requests
+click==8.5.0
+    # via dlt
+dlt==1.30.0
+    # via
+    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in
+    #   vibedata-dlt-core
+    #   vibedata-dlt-duckdb-core
+duckdb==2.0.0
+    # via
+    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in
+    #   dlt
+fsspec==2026.9.0
+    # via dlt
+gitdb==4.0.12
+    # via gitpython
+gitpython==3.2.1
+    # via dlt
+giturlparse==0.16.0
+    # via dlt
+humanize==4.16.0
+    # via dlt
+idna==3.20
+    # via requests
+jsonpath-ng==1.15.0
+    # via dlt
+markdown-it-py==4.2.0
+    # via rich
+mdurl==0.1.2
+    # via markdown-it-py
+orjson==3.13.0
+    # via dlt
+packaging==26.3
+    # via
+    #   dlt
+    #   requirements-parser
+pathvalidate==3.3.1
+    # via dlt
+pendulum==3.3.0
+    # via dlt
+pluggy==1.7.0
+    # via dlt
+pyarrow==25.0.1
+    # via
+    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in
+    #   dlt
+pygments==2.21.0
+    # via rich
+python-dateutil==3.0.0
+    # via pendulum
+pytz==2026.6
+    # via dlt
+pyyaml==6.0.3
+    # via dlt
+requests==2.34.2
+    # via
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in
+    #   dlt
+requirements-parser==0.13.1
+    # via dlt
+rich==15.0.0
+    # via rich-argparse
+rich-argparse==1.8.0
+    # via dlt
+semver==3.1.0
+    # via dlt
+setuptools==84.2.1
+    # via dlt
+simplejson==4.2.0
+    # via dlt
+six==1.17.0
+    # via python-dateutil
+smmap==5.0.3
+    # via gitdb
+sqlglot==30.27.0
+    # via dlt
+tenacity==9.2.1
+    # via dlt
+tomlkit==0.15.2
+    # via dlt
+typing-extensions==4.16.0
+    # via dlt
+tzdata==2026.6
+    # via
+    #   dlt
+    #   pendulum
+    #   python-dateutil
+urllib3==2.8.0
+    # via requests
+vibedata-dlt-core==0.11.0
+    # via
+    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in
+    #   vibedata-dlt-duckdb-core
+vibedata-dlt-duckdb-core==0.3.0
+    # via
+    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in
+vibedata-motherduck-flight==0.1.0
+    # via
+    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
+    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dlt.in

@@ -1,7 +1,7 @@
-# Local and Domain-seeding runs. In a Studio Intent the runtime supplies its own
-# profile (DBT_PROFILE_NAME, DBT_PROFILES_DIR) and this file is not read.
-# The path comes from the same variable the sandbox uses, never a literal:
-# orchestration/run_*.py and docs/setup/seed_domain_duckdb.py set it.
+# In a Studio Intent the runtime supplies its own profile (DBT_PROFILE_NAME,
+# DBT_PROFILES_DIR) and this file is not read. `dev` reads a DuckDB file from
+# VD_EPHM_DUCKDB_LOCAL_PATH; `flight` is what the dbt Flight and
+# orchestration/run_transform.py build under.
 nyc_taxi_analytics:
   target: dev
   outputs:
@@ -10,3 +10,10 @@ nyc_taxi_analytics:
       path: "{{ env_var('VD_EPHM_DUCKDB_LOCAL_PATH') }}"
       schema: main
       threads: 8
+    # Every dbt Flight and orchestration/run_transform.py build under this target.
+    # `type: duckdb`, never `motherduck`: that needs a separate adapter which fails resolution.
+    flight:
+      type: duckdb
+      path: "md:{{ env_var('DESTINATION_DATABASE', 'sa_prd') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'main') }}"
+      threads: 4

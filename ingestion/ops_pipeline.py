@@ -1,11 +1,12 @@
 # ingestion/ops_pipeline.py: loads the fleet operator's platform into `ops_raw`.
-# DuckDB-local domain. Run from the ingestion root via orchestration/run_ingest.py.
+# MotherDuck domain. Its Flight is ingestion/ops_pipeline.Flight/; orchestration/run_ingest.py runs this file in a Studio Intent.
 # Never put credentials or DESTINATION__* config in this file: setup_environment() resolves them.
 import os
 
 import dlt
 from sources.ops import ops_source
 from sources.tlc import trip_tables
+from vibedata.dlt.core import dataset
 from vibedata.dlt.duckdb import finalize, setup_environment
 
 # CONNECTION_NAME: the dlt source section [sources.<name>] in .dlt/config.toml.
@@ -27,8 +28,8 @@ def main():
 
     pipeline = dlt.pipeline(
         pipeline_name=PIPELINE_NAME,
-        destination="duckdb",
-        dataset_name="ops_raw",
+        destination="motherduck",
+        dataset_name=dataset("ops_raw"),
     )
 
     # The operator's records are derived from the yellow trips. They are read in memory

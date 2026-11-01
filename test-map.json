@@ -173,7 +173,7 @@
       ],
       "commands": {
         "unit": "python3 -m pytest tests/test_ossie_validate.py tests/test_ossie_compile.py -q",
-        "structural": "python3 .agents/skills/semantic-model/scripts/ossie.py validate logical-model/ && python3 .agents/skills/semantic-model/scripts/ossie.py coverage logical-model/ transformation/models/marts && python3 .agents/skills/semantic-model/scripts/ossie.py suppliers logical-model/ && python3 .agents/skills/semantic-model/scripts/ossie.py notes logical-model/ transformation/tests docs/adr && python3 .agents/skills/semantic-model/scripts/ossie.py level-tests logical-model/ transformation/tests/assert_semantic_levels_hold.sql --check && python3 .agents/skills/semantic-model/scripts/ossie.py content-tests logical-model/ transformation/tests/assert_semantic_content_holds.sql --check"
+        "structural": "python3 .agents/skills/semantic-model/scripts/ossie.py validate logical-model/ && python3 .agents/skills/semantic-model/scripts/ossie.py coverage logical-model/ transformation/models/marts && python3 .agents/skills/semantic-model/scripts/ossie.py suppliers logical-model/ && python3 .agents/skills/semantic-model/scripts/ossie.py notes logical-model/ transformation/tests docs/adr && python3 .agents/skills/semantic-model/scripts/ossie.py generate-tests logical-model/ transformation/tests --check"
       }
     },
     "ontology": {
@@ -190,5 +190,101 @@
         "structural": "python3 .agents/skills/semantic-model/scripts/ossie.py validate ontology/ && python3 .agents/skills/semantic-model/scripts/ossie.py refs ontology/ logical-model/ && python3 .agents/skills/semantic-model/scripts/ossie.py glossary ontology/ CONTEXT.md"
       }
     }
+  },
+  "ci": {
+    "version": 1,
+    "rules": [
+      {
+        "role": "dbt_project",
+        "checks": [
+          "dbt-gate"
+        ]
+      },
+      {
+        "role": "dbt_project",
+        "paths": [
+          "dbt_project.yml",
+          "packages.yml"
+        ],
+        "checks": [
+          "dbt-gate"
+        ],
+        "all": true
+      },
+      {
+        "role": "ingestion_root",
+        "checks": [
+          "dlt-gate"
+        ]
+      },
+      {
+        "role": "pipeline_flight",
+        "checks": [
+          "dlt-gate"
+        ]
+      },
+      {
+        "role": "source_config",
+        "checks": [
+          "dlt-gate"
+        ],
+        "all": true
+      },
+      {
+        "role": "ingestion_root",
+        "paths": [
+          "requirements.txt"
+        ],
+        "checks": [
+          "dlt-gate"
+        ],
+        "all": true
+      },
+      {
+        "role": "orchestration",
+        "checks": [
+          "orchestration-static"
+        ]
+      },
+      {
+        "role": "ci_plan",
+        "checks": []
+      },
+      {
+        "role": "test_map",
+        "checks": []
+      },
+      {
+        "role": "resource_docs",
+        "checks": []
+      },
+      {
+        "role": "ingestion_root",
+        "paths": [
+          "last-run-preview.md"
+        ],
+        "checks": []
+      },
+      {
+        "paths": [
+          "docs/**",
+          "intent/**",
+          ".agents/**",
+          ".github/**",
+          ".workflow/**",
+          "repo-map.json",
+          "repo-map.schema.json",
+          "test-map.schema.json",
+          ".pre-commit-config.yaml",
+          "requirements-dev.txt",
+          "*.md",
+          ".gitignore",
+          ".gitattributes",
+          ".githooks/**",
+          "creds.example"
+        ],
+        "checks": []
+      }
+    ]
   }
 }

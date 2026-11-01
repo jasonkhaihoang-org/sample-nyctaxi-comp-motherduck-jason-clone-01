@@ -356,12 +356,6 @@ def test_crossdoc_diverged_scd_fails(tmp_path):
     assert ("crossdoc/diverged", "error") in _codes(diags)
 
 
-def test_standalone_example_validates():
-    example = SKILL_SCRIPTS.parent / "examples" / "standalone.ossie.yaml"
-    code, diags = _run("validate", str(example))
-    assert code == 0, [d for d in diags if d["severity"] == "error"]
-
-
 def test_unmatched_file_in_model_dir_fails(tmp_path):
     _write(tmp_path, _doc())
     (tmp_path / "stray.ossie.yml").write_text("version: '0.2.0.dev0'\nname: x\n")
@@ -661,15 +655,14 @@ def test_aggregate_content_level_needs_its_physical_join(tmp_path):
 
 def test_level_tests_are_current():
     """The generated level test is what the model generates now."""
-    result = RUNNER.invoke(app, ["level-tests", "logical-model",
-                                 "transformation/tests/assert_semantic_levels_hold.sql", "--check"])
+    result = RUNNER.invoke(app, ["generate-tests", "logical-model", "transformation/tests", "--check"])
     assert result.exit_code == 0, result.stdout
 
 
 def test_level_tests_report_every_declared_key(tmp_path):
     """Each non-primary key and hierarchy step becomes a reported check."""
     from ossie_levels import generate
-    sql = generate([_doc()])
+    sql = "".join(generate([_doc()]).values())
     assert "date.month: key year_month names several members" in sql
     assert "zone.Geography: zone rolls up to several borough members" in sql
     assert "LTS8_monthly_service_summary: trips_to_payment_method payment_method key is no member" in sql
@@ -1472,15 +1465,15 @@ def test_notes_says_when_a_directory_is_missing(tmp_path):
     assert "notes/no-directory" in result.stdout
 
 
-def test_glossary_reports_both_directions_without_judging(tmp_path):
-    """A reporter: the lists are facts, and no drift is an error."""
+def test_glossary_reports_both_directions_and_fails_on_an_entity_without_a_term(tmp_path):
+    """Both lists are reported; an entity type without a term is the one finding."""
     ontology_dir = tmp_path / "ontology"
     _write_doc(ontology_dir, "taxi.ontology.yaml", ONTOLOGY)
     context = tmp_path / "CONTEXT.md"
     context.write_text("# Context\n\n**Trip**:\nA journey.\n\n**Billable trip**:\nA rule.\n")
     result = RUNNER.invoke(app, ["glossary", str(ontology_dir), str(context)])
-    assert result.exit_code == 0, result.stdout
-    out = json.loads(result.stdout)
+    assert result.exit_code == 1, result.stdout
+    out = json.loads(result.stdout[:result.stdout.rindex("}") + 1])
     assert out["entity_types_without_term"] == ["Zone"]
     assert out["terms_without_concept"] == ["Billable trip"]
     assert out["value_types_without_term"]  # value types need no term

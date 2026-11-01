@@ -78,8 +78,8 @@ python -m pip install -r requirements-dev.txt
 
 ## Full rebuild
 
-To build the file you upload as the Studio Domain database, see
-`docs/setup/seeding-the-domain.md`.
+The Domain's data lives in its MotherDuck database (`sa_prd`). Run each
+`ingestion/<name>_pipeline.Flight/`, then `orchestration/NycTaxiBuild.Flight/`.
 
 
 From the repository root:

@@ -7,7 +7,7 @@ Pinned to upstream commit `c5cb931d72029dc523a5dd18d267f083403786f2`
 The directory tree mirrors upstream, because the validator resolves a schema
 `$ref` that names `core-spec/ossie-schema.json` or `ontology/ontology.json` onto
 the same relative path under this directory. Moving a file breaks resolution
-offline, and the validator would then try to fetch it.
+offline, and the mapping schema then fails with an unresolvable reference.
 
 Canonical definitions (upstream source of truth; these files are copies):
 - Spec: https://github.com/apache/ossie/blob/main/core-spec/spec.md
@@ -18,7 +18,7 @@ Canonical definitions (upstream source of truth; these files are copies):
 - Pinned validator: https://github.com/apache/ossie/blob/c5cb931d72029dc523a5dd18d267f083403786f2/validation/validate.py
 
 To re-pin: download the four files at the new commit, update this note, and
-re-run `python3 -m pytest tests/test_ossie_validate.py -q`. Any upstream
+re-run `python3 -m pytest skills/semantic-model/scripts/__tests__ -q` from the plugin root. Any upstream
 behavior change must surface as a test failure here, never silently.
 
 - `validation/validate.py` — `validation/validate.py` (Apache-2.0, header intact)
