@@ -2,4 +2,4 @@
 * @jasonkhaihoang
 
 # Team-only line: resolves to no person, so preflight warns (VD-7512).
-/.agents/skills/onboarding/templates/repo/repo-map.json @jasonkhaihoang-org/data-domain
+/repo-map.json @jasonkhaihoang-org/data-domain
