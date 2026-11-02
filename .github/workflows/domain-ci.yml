@@ -1,0 +1,19 @@
+# PR validation through the Domain CI engine (jasonkhaihoang-org/domain-cicd sandbox copy, VD-7576).
+name: Domain CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: [main]
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      id-token: write
+    uses: jasonkhaihoang-org/domain-cicd/.github/workflows/domain-ci.yml@main
+    secrets:
+      LLM_API_KEY: ${{ secrets.VD_CI_LLM_API_KEY }}
+      MOTHERDUCK_TOKEN: ${{ secrets.VD_CI_MOTHERDUCK_TOKEN }}
