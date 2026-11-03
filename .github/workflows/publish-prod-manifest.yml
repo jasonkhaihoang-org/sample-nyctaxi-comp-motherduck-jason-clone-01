@@ -20,4 +20,4 @@ permissions:
 
 jobs:
   publish-manifest:
-    uses: jasonkhaihoang-org/domain-cicd/.github/workflows/publish-manifest.yml@main
+    uses: accelerate-data/domain-cicd/.github/workflows/publish-manifest.yml@main
