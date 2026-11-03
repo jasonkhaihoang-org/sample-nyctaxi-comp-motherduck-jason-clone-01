@@ -130,3 +130,10 @@ Days a vehicle is out of service. They are removed from its availability, so a v
 
 **Week**:
 A calendar week, starting on Monday.
+
+**Driver-week**:
+One driver's activity in one week: the days of the week on which the driver worked at least one shift. A week with no shift has no driver-week.
+
+**Incomplete week**:
+A week the data window does not cover in full, at either end, so its totals hold fewer than seven days. It is a property of the window, not of a driver: a driver who worked fewer than seven days of a full week has a complete week.
+_Not_: a short week of work, which is a driver who worked fewer days.

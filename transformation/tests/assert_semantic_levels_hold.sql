@@ -444,6 +444,32 @@ where
 union all
 
 select distinct
+    'shift.LTS4_driver_week: shift_to_date week key is no member' as finding,
+    cast(a.week_start_date as {{ dbt.type_string() }}) as member_key
+from {{ ref('agg_driver_weekly') }} as a
+where
+    a.week_start_date is not null
+    and not exists (
+        select 1 from {{ ref('dim_date') }} as d
+        where d.week_start_date = a.week_start_date
+    )
+
+union all
+
+select distinct
+    'shift.LTS4_driver_week: shift_to_driver row key is no member' as finding,
+    cast(a.driver_key as {{ dbt.type_string() }}) as member_key
+from {{ ref('agg_driver_weekly') }} as a
+where
+    a.driver_key is not null
+    and not exists (
+        select 1 from {{ ref('dim_driver') }} as d
+        where d.driver_key = a.driver_key
+    )
+
+union all
+
+select distinct
     'shift.LTS4_vehicle_day: shift_to_date day key is no member' as finding,
     cast(a.shift_date as {{ dbt.type_string() }}) as member_key
 from {{ ref('agg_vehicle_daily') }} as a

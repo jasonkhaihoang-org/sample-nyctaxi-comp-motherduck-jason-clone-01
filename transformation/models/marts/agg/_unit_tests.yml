@@ -26,3 +26,60 @@ unit_tests:
         - {pickup_location_id: 1, revenue_rank_that_day: 1}
         - {pickup_location_id: 2, revenue_rank_that_day: 1}
         - {pickup_location_id: 3, revenue_rank_that_day: 3}
+
+  # --- agg_driver_weekly: the incomplete-week mark and the rate rebuild --------
+  - name: driver_weekly_marks_the_week_the_window_cuts_short
+    description: >
+      The window runs from the first to the last shift date in the daily table.
+      Its first week holds one day of it, so it is kept and marked incomplete on
+      every row; the next week is complete although driver 1 worked one day of it.
+    model: agg_driver_weekly
+    given:
+      - input: ref('agg_driver_daily')
+        rows:
+          - {shift_date: '2023-12-31', date_key: 20231231, driver_key: 1, shift_count: 1, online_hours: 8.0, on_trip_hours: 4.0, gross_revenue: 200.0, trip_count: 10}
+          - {shift_date: '2024-01-02', date_key: 20240102, driver_key: 1, shift_count: 1, online_hours: 8.0, on_trip_hours: 4.0, gross_revenue: 200.0, trip_count: 10}
+          - {shift_date: '2024-01-07', date_key: 20240107, driver_key: 2, shift_count: 1, online_hours: 8.0, on_trip_hours: 4.0, gross_revenue: 200.0, trip_count: 10}
+      - input: ref('dim_date')
+        rows:
+          - {date_key: 20231231, calendar_date: '2023-12-31', week_start_date: '2023-12-25'}
+          - {date_key: 20240101, calendar_date: '2024-01-01', week_start_date: '2024-01-01'}
+          - {date_key: 20240102, calendar_date: '2024-01-02', week_start_date: '2024-01-01'}
+          - {date_key: 20240103, calendar_date: '2024-01-03', week_start_date: '2024-01-01'}
+          - {date_key: 20240104, calendar_date: '2024-01-04', week_start_date: '2024-01-01'}
+          - {date_key: 20240105, calendar_date: '2024-01-05', week_start_date: '2024-01-01'}
+          - {date_key: 20240106, calendar_date: '2024-01-06', week_start_date: '2024-01-01'}
+          - {date_key: 20240107, calendar_date: '2024-01-07', week_start_date: '2024-01-01'}
+    expect:
+      rows:
+        - {driver_key: 1, week_start_date: '2023-12-25', week_days_covered: 1, is_complete_week: false, days_worked: 1}
+        - {driver_key: 1, week_start_date: '2024-01-01', week_days_covered: 7, is_complete_week: true, days_worked: 1}
+        - {driver_key: 2, week_start_date: '2024-01-01', week_days_covered: 7, is_complete_week: true, days_worked: 1}
+
+  - name: driver_weekly_rebuilds_rates_from_the_weeks_sums
+    description: >
+      Rates are the week's sums divided, never the mean of the daily rates: two
+      days of 1 and 3 online hours give occupancy 3.5 / 4, not the mean 0.75, and
+      revenue per online hour 160 / 4, not the mean 60. A week with no online
+      hours has null rates.
+    model: agg_driver_weekly
+    given:
+      - input: ref('agg_driver_daily')
+        rows:
+          - {shift_date: '2024-01-01', date_key: 20240101, driver_key: 1, shift_count: 1, online_hours: 1.0, on_trip_hours: 0.5, gross_revenue: 100.0, trip_count: 4}
+          - {shift_date: '2024-01-02', date_key: 20240102, driver_key: 1, shift_count: 1, online_hours: 3.0, on_trip_hours: 3.0, gross_revenue: 60.0, trip_count: 4}
+          - {shift_date: '2024-01-03', date_key: 20240103, driver_key: 2, shift_count: 1, online_hours: 0.0, on_trip_hours: 0.0, gross_revenue: 0.0, trip_count: 0}
+      - input: ref('dim_date')
+        rows:
+          - {date_key: 20231231, calendar_date: '2023-12-31', week_start_date: '2023-12-25'}
+          - {date_key: 20240101, calendar_date: '2024-01-01', week_start_date: '2024-01-01'}
+          - {date_key: 20240102, calendar_date: '2024-01-02', week_start_date: '2024-01-01'}
+          - {date_key: 20240103, calendar_date: '2024-01-03', week_start_date: '2024-01-01'}
+          - {date_key: 20240104, calendar_date: '2024-01-04', week_start_date: '2024-01-01'}
+          - {date_key: 20240105, calendar_date: '2024-01-05', week_start_date: '2024-01-01'}
+          - {date_key: 20240106, calendar_date: '2024-01-06', week_start_date: '2024-01-01'}
+          - {date_key: 20240107, calendar_date: '2024-01-07', week_start_date: '2024-01-01'}
+    expect:
+      rows:
+        - {driver_key: 1, occupancy_rate: 0.875, revenue_per_online_hour: 40.0, revenue_per_trip: 20.0}
+        - {driver_key: 2, occupancy_rate: null, revenue_per_online_hour: null, revenue_per_trip: null}

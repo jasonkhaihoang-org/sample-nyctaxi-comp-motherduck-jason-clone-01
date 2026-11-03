@@ -138,6 +138,34 @@ models:
         tests:
           - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
+  - name: agg_driver_weekly
+    description: >
+      Driver-week for the weekly shift-bidding cycle, built from driver-day so
+      the week cannot disagree with its days. The week is dim_date's Monday week
+      (ADR 0014); rates are rebuilt from the week's sums (ADR 0016). A week the
+      data window cuts short is kept with is_complete_week false and the days the
+      window covers in week_days_covered; days_worked is the driver's own.
+    access: protected
+    columns:
+      - name: week_start_date
+        description: Monday of the week, from dim_date.week_start_date.
+        tests: [not_null]
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_driver'), field: driver_key}}
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
+      - name: week_days_covered
+        description: Days of the week inside the data window; seven for a complete week. The same on every row of a week.
+        tests: [not_null]
+      - name: is_complete_week
+        description: True when the data window covers all seven days of the week. False marks an incomplete week, never a driver who worked fewer days.
+        tests: [not_null]
+      - name: days_worked
+        description: Days of the week on which the driver worked at least one shift.
+
   - name: agg_vehicle_daily
     description: >
       Vehicle-day. The asset view of the same shifts. Asset utilisation is taken
