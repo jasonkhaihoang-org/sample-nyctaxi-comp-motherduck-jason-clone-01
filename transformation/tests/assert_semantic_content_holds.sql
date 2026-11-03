@@ -397,6 +397,32 @@ select
 from {{ ref('fct_shift') }} as f
 where NOT (f.vehicle_key) IS NULL
 group by 1
+),
+
+s16_source as (
+select
+    a.month_start_date as shift_to_date__month,
+    a.vehicle_key as shift_to_vehicle__row,
+    sum(a.online_hours) as online_hours,
+    sum(a.on_trip_hours) as on_trip_hours,
+    sum(a.gross_revenue) as gross_revenue,
+    sum(a.on_trip_hours) as fleet_on_trip_hours
+from {{ ref('mart_vehicle_scorecard') }} as a
+group by 1, 2
+),
+
+s16_detail as (
+select
+    d0.month_start_date as shift_to_date__month,
+    f.vehicle_key as shift_to_vehicle__row,
+    SUM((f.online_seconds)) / 3600.0 as online_hours,
+    SUM((f.on_trip_seconds)) / 3600.0 as on_trip_hours,
+    SUM((f.gross_revenue)) as gross_revenue,
+    SUM((f.on_trip_seconds)) / 3600.0 as fleet_on_trip_hours
+from {{ ref('fct_shift') }} as f
+left join {{ ref('dim_date') }} as d0 on f.shift_date_key = d0.date_key
+where NOT (f.vehicle_key) IS NULL
+group by 1, 2
 )
 
 select 'trips.LTS2_zone_day_agg.trip_count at ' || coalesce(cast(coalesce(s.trips_to_date__day, d.trips_to_date__day) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_pickup_zone__zone, d.trips_to_pickup_zone__zone) as varchar), '') as binding,
@@ -771,4 +797,36 @@ select 'shift.LTS8_vehicle_utilisation.fleet_on_trip_hours at ' || coalesce(cast
     cast(s.fleet_on_trip_hours as varchar) as source_value,
     cast(d.fleet_on_trip_hours as varchar) as detail_value
 from s15_source as s full join s15_detail as d on s.shift_to_vehicle__row is not distinct from d.shift_to_vehicle__row
+where ((coalesce(s.fleet_on_trip_hours, 0) is null) <> (coalesce(d.fleet_on_trip_hours, 0) is null) or abs(coalesce(s.fleet_on_trip_hours, 0) - coalesce(d.fleet_on_trip_hours, 0)) > 0.01)
+
+union all
+
+select 'shift.LTS9_vehicle_scorecard.online_hours at ' || coalesce(cast(coalesce(s.shift_to_date__month, d.shift_to_date__month) as varchar), '') || '|' || coalesce(cast(coalesce(s.shift_to_vehicle__row, d.shift_to_vehicle__row) as varchar), '') as binding,
+    cast(s.online_hours as varchar) as source_value,
+    cast(d.online_hours as varchar) as detail_value
+from s16_source as s full join s16_detail as d on s.shift_to_date__month is not distinct from d.shift_to_date__month and s.shift_to_vehicle__row is not distinct from d.shift_to_vehicle__row
+where ((coalesce(s.online_hours, 0) is null) <> (coalesce(d.online_hours, 0) is null) or abs(coalesce(s.online_hours, 0) - coalesce(d.online_hours, 0)) > 0.01)
+
+union all
+
+select 'shift.LTS9_vehicle_scorecard.on_trip_hours at ' || coalesce(cast(coalesce(s.shift_to_date__month, d.shift_to_date__month) as varchar), '') || '|' || coalesce(cast(coalesce(s.shift_to_vehicle__row, d.shift_to_vehicle__row) as varchar), '') as binding,
+    cast(s.on_trip_hours as varchar) as source_value,
+    cast(d.on_trip_hours as varchar) as detail_value
+from s16_source as s full join s16_detail as d on s.shift_to_date__month is not distinct from d.shift_to_date__month and s.shift_to_vehicle__row is not distinct from d.shift_to_vehicle__row
+where ((coalesce(s.on_trip_hours, 0) is null) <> (coalesce(d.on_trip_hours, 0) is null) or abs(coalesce(s.on_trip_hours, 0) - coalesce(d.on_trip_hours, 0)) > 0.01)
+
+union all
+
+select 'shift.LTS9_vehicle_scorecard.gross_revenue at ' || coalesce(cast(coalesce(s.shift_to_date__month, d.shift_to_date__month) as varchar), '') || '|' || coalesce(cast(coalesce(s.shift_to_vehicle__row, d.shift_to_vehicle__row) as varchar), '') as binding,
+    cast(s.gross_revenue as varchar) as source_value,
+    cast(d.gross_revenue as varchar) as detail_value
+from s16_source as s full join s16_detail as d on s.shift_to_date__month is not distinct from d.shift_to_date__month and s.shift_to_vehicle__row is not distinct from d.shift_to_vehicle__row
+where ((coalesce(s.gross_revenue, 0) is null) <> (coalesce(d.gross_revenue, 0) is null) or abs(coalesce(s.gross_revenue, 0) - coalesce(d.gross_revenue, 0)) > 0.01)
+
+union all
+
+select 'shift.LTS9_vehicle_scorecard.fleet_on_trip_hours at ' || coalesce(cast(coalesce(s.shift_to_date__month, d.shift_to_date__month) as varchar), '') || '|' || coalesce(cast(coalesce(s.shift_to_vehicle__row, d.shift_to_vehicle__row) as varchar), '') as binding,
+    cast(s.fleet_on_trip_hours as varchar) as source_value,
+    cast(d.fleet_on_trip_hours as varchar) as detail_value
+from s16_source as s full join s16_detail as d on s.shift_to_date__month is not distinct from d.shift_to_date__month and s.shift_to_vehicle__row is not distinct from d.shift_to_vehicle__row
 where ((coalesce(s.fleet_on_trip_hours, 0) is null) <> (coalesce(d.fleet_on_trip_hours, 0) is null) or abs(coalesce(s.fleet_on_trip_hours, 0) - coalesce(d.fleet_on_trip_hours, 0)) > 0.01)

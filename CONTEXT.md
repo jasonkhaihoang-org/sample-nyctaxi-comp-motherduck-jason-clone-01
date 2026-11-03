@@ -130,3 +130,6 @@ Days a vehicle is out of service. They are removed from its availability, so a v
 
 **Week**:
 A calendar week, starting on Monday.
+
+**Incomplete month**:
+A month the data window cuts short, so the data covers fewer of its days than the calendar month has. A vehicle idle on some days of a full month does not make the month incomplete.

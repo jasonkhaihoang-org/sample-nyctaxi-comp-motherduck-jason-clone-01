@@ -21,6 +21,64 @@ models:
         tests:
           - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
+  - name: mart_vehicle_scorecard
+    access: protected
+    description: >
+      One row per vehicle per calendar month, built on `agg_vehicle_monthly`
+      and nothing below it, so depot managers compare vehicles the way
+      `mart_driver_scorecard` compares drivers. Vehicles are ranked on revenue
+      per online hour, descending, within each month: fleet-wide and within
+      their garage. Tied rates share a rank; a vehicle-month with no online
+      hours has no rate and ranks last. A vehicle-month under 40 online hours
+      is kept, ranked and flagged. Every rate is the month's summed numerator
+      over its summed denominator, null on a zero denominator, with both
+      published beside it.
+    columns:
+      - name: month_start_date
+        description: The first day of the calendar month.
+        tests: [not_null]
+      - name: vehicle_key
+        description: The vehicle; with `month_start_date`, the grain.
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_vehicle'), field: vehicle_key}}
+      - name: medallion_number
+        description: The medallion the vehicle operates under.
+        tests: [not_null]
+      - name: garage_key
+        description: The vehicle's garage, the peer group for `garage_rank`.
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
+      - name: active_days
+        description: Days in the month on which the vehicle ran a shift.
+      - name: trip_count
+        description: Trips in the month; the denominator of `revenue_per_trip`.
+      - name: online_hours
+        description: Hours signed on in the month; the denominator of the hourly rates.
+      - name: on_trip_hours
+        description: Hours on a trip in the month; the numerator of `occupancy_rate`.
+      - name: gross_revenue
+        description: Revenue in the month; the numerator of `revenue_per_online_hour` and `revenue_per_trip`.
+      - name: revenue_per_online_hour
+        description: '`gross_revenue` over `online_hours`, null when the vehicle had no online hours. The ranking measure.'
+      - name: occupancy_rate
+        description: '{{ doc("occupancy_rate") }}'
+      - name: revenue_per_trip
+        description: '`gross_revenue` over `trip_count`, null when the vehicle made no trip.'
+      - name: trips_per_online_hour
+        description: '`trip_count` over `online_hours`, null when the vehicle had no online hours.'
+      - name: is_below_ranking_floor
+        description: True when the vehicle-month has fewer than 40 online hours. It is still ranked.
+        tests: [not_null]
+      - name: is_incomplete_month
+        description: True when the data window cuts the month short, so no vehicle was active on all its days; a vehicle idle on some days of a full month does not mark it.
+        tests: [not_null]
+      - name: fleet_rank
+        description: Rank on `revenue_per_online_hour`, descending, across the fleet within the month.
+      - name: garage_rank
+        description: Rank on `revenue_per_online_hour`, descending, within the vehicle's garage and month.
+
   - name: mart_vehicle_utilisation
     description: Asset utilisation for the period with downtime netted out.
     columns:

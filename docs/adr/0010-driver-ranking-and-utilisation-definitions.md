@@ -24,3 +24,4 @@ Driver performance is ranked on revenue per online hour, not gross revenue: gros
 
 - [`models/ops/mart_driver_scorecard.md`](../design/models/ops/mart_driver_scorecard.md)
 - [`models/core/fct_shift.md`](../design/models/core/fct_shift.md)
+- [`models/ops/mart_vehicle_scorecard.md`](../design/models/ops/mart_vehicle_scorecard.md)

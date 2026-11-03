@@ -535,6 +535,32 @@ where
 union all
 
 select distinct
+    'shift.LTS9_vehicle_scorecard: shift_to_date month key is no member' as finding,
+    cast(a.month_start_date as {{ dbt.type_string() }}) as member_key
+from {{ ref('mart_vehicle_scorecard') }} as a
+where
+    a.month_start_date is not null
+    and not exists (
+        select 1 from {{ ref('dim_date') }} as d
+        where d.month_start_date = a.month_start_date
+    )
+
+union all
+
+select distinct
+    'shift.LTS9_vehicle_scorecard: shift_to_vehicle row key is no member' as finding,
+    cast(a.vehicle_key as {{ dbt.type_string() }}) as member_key
+from {{ ref('mart_vehicle_scorecard') }} as a
+where
+    a.vehicle_key is not null
+    and not exists (
+        select 1 from {{ ref('dim_vehicle') }} as d
+        where d.vehicle_key = a.vehicle_key
+    )
+
+union all
+
+select distinct
     'status_interval.LTS2_zone_hour: status_interval_to_date day key is no member' as finding,
     cast(a.interval_date as {{ dbt.type_string() }}) as member_key
 from {{ ref('agg_zone_occupancy_hourly') }} as a

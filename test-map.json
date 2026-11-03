@@ -133,7 +133,8 @@
         "transformation/models/marts/ops/_unit_tests.yml"
       ],
       "data": [
-        "transformation/tests/assert_mart_trip_quality_scorecard_one_row_per_vendor_service_month.sql"
+        "transformation/tests/assert_mart_trip_quality_scorecard_one_row_per_vendor_service_month.sql",
+        "transformation/tests/assert_mart_vehicle_scorecard_one_row_per_vehicle_month.sql"
       ],
       "selectors": {
         "data": "path:models/marts/ops",

@@ -23,3 +23,48 @@ unit_tests:
         - {driver_key: 2, fleet_rank: 2, garage_rank: 1, is_below_ranking_floor: false}
         - {driver_key: 3, fleet_rank: 1, garage_rank: 1, is_below_ranking_floor: false}
         - {driver_key: 4, fleet_rank: 4, garage_rank: 2, is_below_ranking_floor: true}
+
+
+  # --- mart_vehicle_scorecard: ranking, ties, the floor, the cut-short month --
+  - name: vehicle_scorecard_ranks_within_each_month_and_garage_and_shares_a_tied_rank
+    description: >
+      Ranks restart each month, fleet-wide and within garage. Two vehicles with the
+      same revenue per online hour share a rank and the next one is skipped. A
+      vehicle-month with no online hours has no rate and ranks last. One under 40
+      online hours is ranked and flagged, never dropped.
+    model: mart_vehicle_scorecard
+    given:
+      - input: ref('agg_vehicle_monthly')
+        rows:
+          - {month_start_date: '2024-01-01', vehicle_key: 1, medallion_number: 1A01, garage_key: 1, active_days: 31, calendar_days: 31, trip_count: 100, online_hours: 100.0, on_trip_hours: 60.0, gross_revenue: 3000.0}
+          - {month_start_date: '2024-01-01', vehicle_key: 2, medallion_number: 1A02, garage_key: 1, active_days: 20, calendar_days: 31, trip_count: 50, online_hours: 50.0, on_trip_hours: 30.0, gross_revenue: 1500.0}
+          - {month_start_date: '2024-01-01', vehicle_key: 3, medallion_number: 2B01, garage_key: 2, active_days: 10, calendar_days: 31, trip_count: 20, online_hours: 30.0, on_trip_hours: 15.0, gross_revenue: 600.0}
+          - {month_start_date: '2024-01-01', vehicle_key: 4, medallion_number: 2B02, garage_key: 2, active_days: 1, calendar_days: 31, trip_count: 0, online_hours: 0.0, on_trip_hours: 0.0, gross_revenue: 0.0}
+          - {month_start_date: '2024-02-01', vehicle_key: 3, medallion_number: 2B01, garage_key: 2, active_days: 29, calendar_days: 29, trip_count: 80, online_hours: 120.0, on_trip_hours: 70.0, gross_revenue: 2400.0}
+    expect:
+      rows:
+        - {month_start_date: '2024-01-01', vehicle_key: 1, revenue_per_online_hour: 30.0, fleet_rank: 1, garage_rank: 1, is_below_ranking_floor: false}
+        - {month_start_date: '2024-01-01', vehicle_key: 2, revenue_per_online_hour: 30.0, fleet_rank: 1, garage_rank: 1, is_below_ranking_floor: false}
+        - {month_start_date: '2024-01-01', vehicle_key: 3, revenue_per_online_hour: 20.0, fleet_rank: 3, garage_rank: 1, is_below_ranking_floor: true}
+        - {month_start_date: '2024-01-01', vehicle_key: 4, revenue_per_online_hour: null, fleet_rank: 4, garage_rank: 2, is_below_ranking_floor: true}
+        - {month_start_date: '2024-02-01', vehicle_key: 3, revenue_per_online_hour: 20.0, fleet_rank: 1, garage_rank: 1, is_below_ranking_floor: false}
+
+  - name: vehicle_scorecard_marks_only_a_cut_short_month
+    description: >
+      In December no vehicle was active on all 31 days, because the data starts on
+      the 31st, so the month is incomplete. In January one vehicle was active every
+      day, so the month is complete even for the vehicle idle on most of it.
+    model: mart_vehicle_scorecard
+    given:
+      - input: ref('agg_vehicle_monthly')
+        rows:
+          - {month_start_date: '2023-12-01', vehicle_key: 1, medallion_number: 1A01, garage_key: 1, active_days: 1, calendar_days: 31, trip_count: 5, online_hours: 8.0, on_trip_hours: 4.0, gross_revenue: 200.0}
+          - {month_start_date: '2023-12-01', vehicle_key: 2, medallion_number: 1A02, garage_key: 1, active_days: 1, calendar_days: 31, trip_count: 4, online_hours: 6.0, on_trip_hours: 3.0, gross_revenue: 120.0}
+          - {month_start_date: '2024-01-01', vehicle_key: 1, medallion_number: 1A01, garage_key: 1, active_days: 31, calendar_days: 31, trip_count: 150, online_hours: 240.0, on_trip_hours: 120.0, gross_revenue: 6000.0}
+          - {month_start_date: '2024-01-01', vehicle_key: 2, medallion_number: 1A02, garage_key: 1, active_days: 3, calendar_days: 31, trip_count: 12, online_hours: 24.0, on_trip_hours: 10.0, gross_revenue: 480.0}
+    expect:
+      rows:
+        - {month_start_date: '2023-12-01', vehicle_key: 1, is_incomplete_month: true}
+        - {month_start_date: '2023-12-01', vehicle_key: 2, is_incomplete_month: true}
+        - {month_start_date: '2024-01-01', vehicle_key: 1, is_incomplete_month: false}
+        - {month_start_date: '2024-01-01', vehicle_key: 2, is_incomplete_month: false}
