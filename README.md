@@ -81,6 +81,10 @@ python -m pip install -r requirements-dev.txt
 The Domain's data lives in its MotherDuck database (`sa_prd`). Run each
 `ingestion/<name>_pipeline.Flight/`, then `orchestration/NycTaxiBuild.Flight/`.
 
+## Weekly driver refresh
+
+`orchestration/DriverWeeklyRefresh.Flight/` rebuilds the driver models for shift bidding: `dbt deps`, then `dbt build --select agg_driver_daily+` (`agg_driver_daily`, then `agg_driver_monthly` and `mart_driver_scorecard`, which read it). It reloads no source; the sources are loaded as above. Its committed schedule is `0 9 * * 1` UTC: Mondays at 05:00 New York during daylight saving (09:00 − 4 h) and 04:00 in winter (09:00 − 5 h). The schedule takes effect only once CD deploys the Flight on a Business plan. A failed run touches only those three models; `NycTaxiBuild.Flight` is separate.
+
 
 From the repository root:
 

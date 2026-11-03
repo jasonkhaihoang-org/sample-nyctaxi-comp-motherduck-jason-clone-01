@@ -27,3 +27,4 @@ The TLC trips and zone lookup, the fleet operator's platform (`ops_raw`) and the
 - [`pipelines/mdm.md`](../design/pipelines/mdm.md)
 - [`models/staging/stg_tlc__yellow_tripdata.md`](../design/models/staging/stg_tlc__yellow_tripdata.md)
 - [`models/staging/stg_tlc__green_tripdata.md`](../design/models/staging/stg_tlc__green_tripdata.md)
+- [`orchestration/driver_weekly_refresh.md`](../design/orchestration/driver_weekly_refresh.md)

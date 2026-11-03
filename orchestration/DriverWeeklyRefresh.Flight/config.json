@@ -1,0 +1,10 @@
+{
+  "GIT_REF": "main",
+  "DESTINATION_DATABASE": "sa_prd",
+  "DBT_SCHEMA": "main",
+  "DBT_EMPTY_RUN": "false",
+  "schedule_cron": "0 9 * * 1",
+  "flight_secret_names": [
+    "nyc_taxi_motherduck_demo_git_auth"
+  ]
+}
