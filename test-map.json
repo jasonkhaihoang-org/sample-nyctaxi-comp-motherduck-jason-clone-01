@@ -98,7 +98,8 @@
         "transformation/tests/assert_agg_vehicle_daily_one_row_per_vehicle_day.sql",
         "transformation/tests/assert_agg_vehicle_monthly_one_row_per_vehicle_month.sql",
         "transformation/tests/assert_agg_weather_demand_daily_one_row_per_borough_day.sql",
-        "transformation/tests/assert_agg_zone_occupancy_hourly_one_row_per_zone_hour.sql"
+        "transformation/tests/assert_agg_zone_occupancy_hourly_one_row_per_zone_hour.sql",
+        "transformation/tests/assert_agg_hvfhv_trip_zone_daily_one_row_per_pickup_zone_and_date.sql"
       ],
       "selectors": {
         "data": "path:models/marts/agg",

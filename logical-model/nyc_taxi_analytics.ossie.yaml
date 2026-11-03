@@ -1,6 +1,6 @@
 version: "0.2.0.dev0"
 name: nyc_taxi_trips
-description: One row per TLC trip (yellow + green, 2024-01 to 2024-03) with billable flag, fleet attribution, and conformed dimensions. Trips star of the nyc-taxi-duckdb-demo warehouse.
+description: One row per TLC trip (yellow + green, 2024-01 to 2024-03) with billable flag, fleet attribution, and conformed dimensions. Trips star of the nyc-taxi-duckdb-demo warehouse, beside the HVFHV star (hvfhv_zone_day), which shares its zone and date dimensions.
 ai_context:
   instructions: Use for trip-level revenue and demand analysis inside the report window (ADR 0003). Billable math must filter on is_billable; green trips never carry airport_fee.
   synonyms:
@@ -613,6 +613,42 @@ datasets:
     custom_extensions:
       - vendor_name: VIBEDATA
         data: '{"vibedata_version": "1.5", "logical_sources": [{"name": "LTS1_detail", "physical_table": "bridge_zone_poi", "priority_group": 1, "content_grain": ["poi"], "note": "One row per (zone, POI category). A zone-level measure reaches it through zone_poi_to_zone from the one side and is allocated by allocation_factor, whose shares sum to 1 per zone: held by assert_zone_poi_allocation_sums_to_one. A zone with no POI keeps its trips under a null category at weight 1, so no trip is dropped (ADR 0015).", "column_map": {"poi_id": "poi_id", "zone_natural_key": "zone_natural_key", "poi_category": "poi_category", "poi_category_name": "poi_category_name", "poi_name": "poi_name", "demand_weight": "demand_weight", "allocation_factor": "allocation_factor"}}]}'
+  - name: hvfhv_zone_day
+    source: agg.agg_hvfhv_trip_zone_daily
+    primary_key: [pickup_location_id, pickup_date]
+    description: One row per pickup zone per pickup date with the day's HVFHV trip count. A separate business process from trips (HVFHV trips stay out of the trip fact, proposal 0001), so it is its own star; it shares the zone and date dimensions so its volume reads beside trip_count. It is an aggregate mart, so no ontology concept maps it, and HVFHV trips have no boundary fact a concept could map.
+    ai_context:
+      synonyms:
+        - HVFHV volume
+        - Uber and Lyft trips
+        - high-volume for-hire trips
+    fields:
+      - name: pickup_location_id
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: pickup_location_id
+        datatype: Integer
+        description: TLC location id of the pickup zone; the zone's natural key, and what the join to zone matches. Unknown zones are kept.
+      - name: pickup_date
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: pickup_date
+        datatype: Date
+        dimension:
+          is_time: true
+        description: Calendar date of the HVFHV pickup.
+      - name: hvfhv_trip_count
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: hvfhv_trip_count
+        datatype: Integer
+        description: HVFHV trips picked up in the zone on the day, every licensee combined.
+    custom_extensions:
+      - vendor_name: VIBEDATA
+        data: '{"vibedata_version": "1.5", "logical_sources": [{"name": "LTS1_detail", "physical_table": "agg_hvfhv_trip_zone_daily", "priority_group": 1, "content_grain": ["pickup_date", "pickup_location_id"], "note": "The finest HVFHV grain at the boundary: staging is internal, so this aggregate is the star''s detail. Every HVFHV trip in the report window, unknown zones included (ADR 0003, ADR 0012); its grain is held by assert_agg_hvfhv_trip_zone_daily_one_row_per_pickup_zone_and_date.", "column_map": {"pickup_location_id": "pickup_location_id", "pickup_date": "pickup_date", "hvfhv_trip_count": "hvfhv_trip_count"}}]}'
 relationships:
   - name: trips_to_pickup_zone
     from: trips
@@ -720,6 +756,29 @@ relationships:
     custom_extensions:
       - vendor_name: VIBEDATA
         data: '{"vibedata_version": "1.5", "physical_join": "bridge_zone_poi_to_dim_zone", "cardinality": "many-to-one", "join_type": "LEFT OUTER", "to_level": "zone", "weight": "allocation_factor", "note": "Joins the zone member, not a version: to_columns are the zone level''s primary key. A query reaching zone through a role (pickup, dropoff) reuses that role''s alias for this join"}'
+  - name: hvfhv_zone_day_to_pickup_zone
+    from: hvfhv_zone_day
+    to: zone
+    from_columns:
+      - pickup_location_id
+    to_columns:
+      - zone_natural_key
+    ai_context:
+      synonyms:
+        - HVFHV pickup zone
+    custom_extensions:
+      - vendor_name: VIBEDATA
+        data: '{"vibedata_version": "1.5", "physical_join": "agg_hvfhv_trip_zone_daily_to_Pickup_Zone", "cardinality": "many-to-one", "join_type": "LEFT OUTER", "to_level": "zone", "note": "Joins the zone member, not a version: to_columns are the zone level''s primary key, so unknown zones 264 and 265 join like any other."}'
+  - name: hvfhv_zone_day_to_date
+    from: hvfhv_zone_day
+    to: date
+    from_columns:
+      - pickup_date
+    to_columns:
+      - calendar_date
+    custom_extensions:
+      - vendor_name: VIBEDATA
+        data: '{"vibedata_version": "1.5", "physical_join": "agg_hvfhv_trip_zone_daily_to_dim_date", "cardinality": "many-to-one", "join_type": "LEFT OUTER", "to_level": "day"}'
 metrics:
   - name: trip_count
     expression:
@@ -890,6 +949,19 @@ metrics:
     custom_extensions:
       - vendor_name: VIBEDATA
         data: '{"vibedata_version": "1.5", "aggregation": "SUM", "time_series": {"function": "ROLLING", "of": "billable_trip_count", "via": "trips_to_date", "level": "day", "periods": 7}}'
+  - name: hvfhv_trip_count
+    expression:
+      dialects:
+        - dialect: ANSI_SQL
+          expression: SUM(hvfhv_zone_day.hvfhv_trip_count)
+    description: HVFHV trips, every licensee combined; read beside trip_count by zone and day.
+    datatype: Integer
+    ai_context:
+      synonyms:
+        - HVFHV trips
+    custom_extensions:
+      - vendor_name: VIBEDATA
+        data: '{"vibedata_version": "1.5", "aggregation": "SUM"}'
 custom_extensions:
   - vendor_name: VIBEDATA
-    data: '{"vibedata_version": "1.5", "physical_tables": [{"name": "fct_trip", "source": "core.fct_trip", "dbt_model": "fct_trip", "table_type": "TABLE"}, {"name": "dim_date", "source": "core.dim_date", "dbt_model": "dim_date", "table_type": "TABLE"}, {"name": "dim_zone", "source": "core.dim_zone", "dbt_model": "dim_zone", "table_type": "TABLE"}, {"name": "Pickup_Zone", "source": "core.dim_zone", "dbt_model": "dim_zone", "table_type": "ALIAS", "alias_of": "dim_zone", "role": "origin zone for trips"}, {"name": "Dropoff_Zone", "source": "core.dim_zone", "dbt_model": "dim_zone", "table_type": "ALIAS", "alias_of": "dim_zone", "role": "destination zone for trips"}, {"name": "dim_vendor", "source": "core.dim_vendor", "dbt_model": "dim_vendor", "table_type": "TABLE"}, {"name": "dim_payment_method", "source": "core.dim_payment_method", "dbt_model": "dim_payment_method", "table_type": "TABLE"}, {"name": "dim_trip_quality", "source": "core.dim_trip_quality", "dbt_model": "dim_trip_quality", "table_type": "TABLE"}, {"name": "agg_trip_zone_daily", "source": "agg.agg_trip_zone_daily", "dbt_model": "agg_trip_zone_daily", "table_type": "TABLE"}, {"name": "agg_trip_zone_daypart_dow", "source": "agg.agg_trip_zone_daypart_dow", "dbt_model": "agg_trip_zone_daypart_dow", "table_type": "TABLE"}, {"name": "agg_trip_band_profile", "source": "agg.agg_trip_band_profile", "dbt_model": "agg_trip_band_profile", "table_type": "TABLE"}, {"name": "agg_weather_demand_daily", "source": "agg.agg_weather_demand_daily", "dbt_model": "agg_weather_demand_daily", "table_type": "TABLE"}, {"name": "agg_od_flow_matrix", "source": "agg.agg_od_flow_matrix", "dbt_model": "agg_od_flow_matrix", "table_type": "TABLE"}, {"name": "dim_daypart", "source": "core.dim_daypart", "dbt_model": "dim_daypart", "table_type": "TABLE"}, {"name": "dim_rate_plan", "source": "core.dim_rate_plan", "dbt_model": "dim_rate_plan", "table_type": "TABLE"}, {"name": "dim_service_type", "source": "core.dim_service_type", "dbt_model": "dim_service_type", "table_type": "TABLE"}, {"name": "mart_daily_zone_revenue", "source": "finance.mart_daily_zone_revenue", "dbt_model": "mart_daily_zone_revenue", "table_type": "TABLE"}, {"name": "mart_monthly_service_summary", "source": "finance.mart_monthly_service_summary", "dbt_model": "mart_monthly_service_summary", "table_type": "TABLE"}, {"name": "mart_revenue_component_bridge", "source": "finance.mart_revenue_component_bridge", "dbt_model": "mart_revenue_component_bridge", "table_type": "TABLE", "note": "Registered, not mapped (S8): unpivoted fare-component bridge, one row per trip_month x service_type_key x borough_name x component_name. Every addable trip or revenue measure is repeated once per component, so any sum fans out x9; component_amount has no metric counterpart. No honest logical source exists."}, {"name": "mart_trip_quality_scorecard", "source": "ops.mart_trip_quality_scorecard", "dbt_model": "mart_trip_quality_scorecard", "table_type": "TABLE"}, {"name": "bridge_zone_poi", "source": "core.bridge_zone_poi", "dbt_model": "bridge_zone_poi", "table_type": "TABLE", "note": "Weighted bridge from the zone member to its points of interest (zone_poi_to_zone). Any join through it multiplies rows, so measures are allocated by allocation_factor"}], "physical_joins": [{"name": "fct_trip_to_Pickup_Zone", "from": "fct_trip", "to": "Pickup_Zone"}, {"name": "fct_trip_to_Dropoff_Zone", "from": "fct_trip", "to": "Dropoff_Zone"}, {"name": "fct_trip_to_dim_date", "from": "fct_trip", "to": "dim_date"}, {"name": "fct_trip_to_dim_vendor", "from": "fct_trip", "to": "dim_vendor"}, {"name": "fct_trip_to_dim_payment_method", "from": "fct_trip", "to": "dim_payment_method"}, {"name": "fct_trip_to_dim_trip_quality", "from": "fct_trip", "to": "dim_trip_quality"}, {"name": "fct_trip_to_dim_daypart", "from": "fct_trip", "to": "dim_daypart"}, {"name": "fct_trip_to_dim_rate_plan", "from": "fct_trip", "to": "dim_rate_plan"}, {"name": "fct_trip_to_dim_service_type", "from": "fct_trip", "to": "dim_service_type"}, {"name": "mart_monthly_service_summary_to_dim_service_type", "from": "mart_monthly_service_summary", "to": "dim_service_type"}, {"name": "mart_trip_quality_scorecard_to_dim_service_type", "from": "mart_trip_quality_scorecard", "to": "dim_service_type"}, {"name": "agg_trip_zone_daily_to_dim_date", "from": "agg_trip_zone_daily", "to": "dim_date"}, {"name": "agg_trip_zone_daily_to_Pickup_Zone", "from": "agg_trip_zone_daily", "to": "Pickup_Zone"}, {"name": "agg_trip_zone_daypart_dow_to_Pickup_Zone", "from": "agg_trip_zone_daypart_dow", "to": "Pickup_Zone"}, {"name": "agg_trip_zone_daypart_dow_to_dim_daypart", "from": "agg_trip_zone_daypart_dow", "to": "dim_daypart"}, {"name": "agg_trip_zone_daypart_dow_to_dim_service_type", "from": "agg_trip_zone_daypart_dow", "to": "dim_service_type"}, {"name": "agg_trip_band_profile_to_dim_service_type", "from": "agg_trip_band_profile", "to": "dim_service_type"}, {"name": "agg_trip_band_profile_to_dim_daypart", "from": "agg_trip_band_profile", "to": "dim_daypart"}, {"name": "agg_trip_band_profile_to_Pickup_Zone", "from": "agg_trip_band_profile", "to": "Pickup_Zone"}, {"name": "agg_weather_demand_daily_to_dim_date", "from": "agg_weather_demand_daily", "to": "dim_date"}, {"name": "agg_weather_demand_daily_to_Pickup_Zone", "from": "agg_weather_demand_daily", "to": "Pickup_Zone"}, {"name": "agg_od_flow_matrix_to_Pickup_Zone", "from": "agg_od_flow_matrix", "to": "Pickup_Zone"}, {"name": "agg_od_flow_matrix_to_Dropoff_Zone", "from": "agg_od_flow_matrix", "to": "Dropoff_Zone"}, {"name": "mart_daily_zone_revenue_to_dim_date", "from": "mart_daily_zone_revenue", "to": "dim_date"}, {"name": "mart_daily_zone_revenue_to_Pickup_Zone", "from": "mart_daily_zone_revenue", "to": "Pickup_Zone"}, {"name": "mart_monthly_service_summary_to_dim_date", "from": "mart_monthly_service_summary", "to": "dim_date"}, {"name": "mart_monthly_service_summary_to_dim_payment_method", "from": "mart_monthly_service_summary", "to": "dim_payment_method"}, {"name": "mart_trip_quality_scorecard_to_dim_date", "from": "mart_trip_quality_scorecard", "to": "dim_date"}, {"name": "mart_trip_quality_scorecard_to_dim_vendor", "from": "mart_trip_quality_scorecard", "to": "dim_vendor"}, {"name": "bridge_zone_poi_to_dim_zone", "from": "bridge_zone_poi", "to": "dim_zone"}]}'
+    data: '{"vibedata_version": "1.5", "physical_tables": [{"name": "fct_trip", "source": "core.fct_trip", "dbt_model": "fct_trip", "table_type": "TABLE"}, {"name": "dim_date", "source": "core.dim_date", "dbt_model": "dim_date", "table_type": "TABLE"}, {"name": "dim_zone", "source": "core.dim_zone", "dbt_model": "dim_zone", "table_type": "TABLE"}, {"name": "Pickup_Zone", "source": "core.dim_zone", "dbt_model": "dim_zone", "table_type": "ALIAS", "alias_of": "dim_zone", "role": "origin zone for trips"}, {"name": "Dropoff_Zone", "source": "core.dim_zone", "dbt_model": "dim_zone", "table_type": "ALIAS", "alias_of": "dim_zone", "role": "destination zone for trips"}, {"name": "dim_vendor", "source": "core.dim_vendor", "dbt_model": "dim_vendor", "table_type": "TABLE"}, {"name": "dim_payment_method", "source": "core.dim_payment_method", "dbt_model": "dim_payment_method", "table_type": "TABLE"}, {"name": "dim_trip_quality", "source": "core.dim_trip_quality", "dbt_model": "dim_trip_quality", "table_type": "TABLE"}, {"name": "agg_trip_zone_daily", "source": "agg.agg_trip_zone_daily", "dbt_model": "agg_trip_zone_daily", "table_type": "TABLE"}, {"name": "agg_hvfhv_trip_zone_daily", "source": "agg.agg_hvfhv_trip_zone_daily", "dbt_model": "agg_hvfhv_trip_zone_daily", "table_type": "TABLE"}, {"name": "agg_trip_zone_daypart_dow", "source": "agg.agg_trip_zone_daypart_dow", "dbt_model": "agg_trip_zone_daypart_dow", "table_type": "TABLE"}, {"name": "agg_trip_band_profile", "source": "agg.agg_trip_band_profile", "dbt_model": "agg_trip_band_profile", "table_type": "TABLE"}, {"name": "agg_weather_demand_daily", "source": "agg.agg_weather_demand_daily", "dbt_model": "agg_weather_demand_daily", "table_type": "TABLE"}, {"name": "agg_od_flow_matrix", "source": "agg.agg_od_flow_matrix", "dbt_model": "agg_od_flow_matrix", "table_type": "TABLE"}, {"name": "dim_daypart", "source": "core.dim_daypart", "dbt_model": "dim_daypart", "table_type": "TABLE"}, {"name": "dim_rate_plan", "source": "core.dim_rate_plan", "dbt_model": "dim_rate_plan", "table_type": "TABLE"}, {"name": "dim_service_type", "source": "core.dim_service_type", "dbt_model": "dim_service_type", "table_type": "TABLE"}, {"name": "mart_daily_zone_revenue", "source": "finance.mart_daily_zone_revenue", "dbt_model": "mart_daily_zone_revenue", "table_type": "TABLE"}, {"name": "mart_monthly_service_summary", "source": "finance.mart_monthly_service_summary", "dbt_model": "mart_monthly_service_summary", "table_type": "TABLE"}, {"name": "mart_revenue_component_bridge", "source": "finance.mart_revenue_component_bridge", "dbt_model": "mart_revenue_component_bridge", "table_type": "TABLE", "note": "Registered, not mapped (S8): unpivoted fare-component bridge, one row per trip_month x service_type_key x borough_name x component_name. Every addable trip or revenue measure is repeated once per component, so any sum fans out x9; component_amount has no metric counterpart. No honest logical source exists."}, {"name": "mart_trip_quality_scorecard", "source": "ops.mart_trip_quality_scorecard", "dbt_model": "mart_trip_quality_scorecard", "table_type": "TABLE"}, {"name": "bridge_zone_poi", "source": "core.bridge_zone_poi", "dbt_model": "bridge_zone_poi", "table_type": "TABLE", "note": "Weighted bridge from the zone member to its points of interest (zone_poi_to_zone). Any join through it multiplies rows, so measures are allocated by allocation_factor"}], "physical_joins": [{"name": "fct_trip_to_Pickup_Zone", "from": "fct_trip", "to": "Pickup_Zone"}, {"name": "fct_trip_to_Dropoff_Zone", "from": "fct_trip", "to": "Dropoff_Zone"}, {"name": "fct_trip_to_dim_date", "from": "fct_trip", "to": "dim_date"}, {"name": "fct_trip_to_dim_vendor", "from": "fct_trip", "to": "dim_vendor"}, {"name": "fct_trip_to_dim_payment_method", "from": "fct_trip", "to": "dim_payment_method"}, {"name": "fct_trip_to_dim_trip_quality", "from": "fct_trip", "to": "dim_trip_quality"}, {"name": "fct_trip_to_dim_daypart", "from": "fct_trip", "to": "dim_daypart"}, {"name": "fct_trip_to_dim_rate_plan", "from": "fct_trip", "to": "dim_rate_plan"}, {"name": "fct_trip_to_dim_service_type", "from": "fct_trip", "to": "dim_service_type"}, {"name": "mart_monthly_service_summary_to_dim_service_type", "from": "mart_monthly_service_summary", "to": "dim_service_type"}, {"name": "mart_trip_quality_scorecard_to_dim_service_type", "from": "mart_trip_quality_scorecard", "to": "dim_service_type"}, {"name": "agg_trip_zone_daily_to_dim_date", "from": "agg_trip_zone_daily", "to": "dim_date"}, {"name": "agg_trip_zone_daily_to_Pickup_Zone", "from": "agg_trip_zone_daily", "to": "Pickup_Zone"}, {"name": "agg_hvfhv_trip_zone_daily_to_Pickup_Zone", "from": "agg_hvfhv_trip_zone_daily", "to": "Pickup_Zone"}, {"name": "agg_hvfhv_trip_zone_daily_to_dim_date", "from": "agg_hvfhv_trip_zone_daily", "to": "dim_date"}, {"name": "agg_trip_zone_daypart_dow_to_Pickup_Zone", "from": "agg_trip_zone_daypart_dow", "to": "Pickup_Zone"}, {"name": "agg_trip_zone_daypart_dow_to_dim_daypart", "from": "agg_trip_zone_daypart_dow", "to": "dim_daypart"}, {"name": "agg_trip_zone_daypart_dow_to_dim_service_type", "from": "agg_trip_zone_daypart_dow", "to": "dim_service_type"}, {"name": "agg_trip_band_profile_to_dim_service_type", "from": "agg_trip_band_profile", "to": "dim_service_type"}, {"name": "agg_trip_band_profile_to_dim_daypart", "from": "agg_trip_band_profile", "to": "dim_daypart"}, {"name": "agg_trip_band_profile_to_Pickup_Zone", "from": "agg_trip_band_profile", "to": "Pickup_Zone"}, {"name": "agg_weather_demand_daily_to_dim_date", "from": "agg_weather_demand_daily", "to": "dim_date"}, {"name": "agg_weather_demand_daily_to_Pickup_Zone", "from": "agg_weather_demand_daily", "to": "Pickup_Zone"}, {"name": "agg_od_flow_matrix_to_Pickup_Zone", "from": "agg_od_flow_matrix", "to": "Pickup_Zone"}, {"name": "agg_od_flow_matrix_to_Dropoff_Zone", "from": "agg_od_flow_matrix", "to": "Dropoff_Zone"}, {"name": "mart_daily_zone_revenue_to_dim_date", "from": "mart_daily_zone_revenue", "to": "dim_date"}, {"name": "mart_daily_zone_revenue_to_Pickup_Zone", "from": "mart_daily_zone_revenue", "to": "Pickup_Zone"}, {"name": "mart_monthly_service_summary_to_dim_date", "from": "mart_monthly_service_summary", "to": "dim_date"}, {"name": "mart_monthly_service_summary_to_dim_payment_method", "from": "mart_monthly_service_summary", "to": "dim_payment_method"}, {"name": "mart_trip_quality_scorecard_to_dim_date", "from": "mart_trip_quality_scorecard", "to": "dim_date"}, {"name": "mart_trip_quality_scorecard_to_dim_vendor", "from": "mart_trip_quality_scorecard", "to": "dim_vendor"}, {"name": "bridge_zone_poi_to_dim_zone", "from": "bridge_zone_poi", "to": "dim_zone"}]}'

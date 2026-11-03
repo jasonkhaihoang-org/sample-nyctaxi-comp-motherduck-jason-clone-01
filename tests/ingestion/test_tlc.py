@@ -68,3 +68,38 @@ def test_months_can_be_set_from_the_environment(monkeypatch):
     monkeypatch.setenv("SOURCES__TLC__MONTHS", '["2024-01"]')
     source = tlc.tlc_source.clone(name="tlc", section="tlc")(fetch=_fetch)
     assert len(list(source.resources["green_tripdata"])) == 1
+
+
+def _download_row_groups(row_groups: int, rows_per_group: int):
+    """A download that writes a Parquet file of the given row groups, recording each URL."""
+    urls = []
+
+    def download(url: str, path: str) -> None:
+        urls.append(url)
+        table = pa.table({"PULocationID": list(range(row_groups * rows_per_group))})
+        pq.write_table(table, path, row_group_size=rows_per_group)
+
+    return download, urls
+
+
+def test_hvfhv_url_format():
+    assert (
+        tlc.hvfhv_url("2024-01")
+        == "https://d37ci6vzurychx.cloudfront.net/trip-data/fhvhv_tripdata_2024-01.parquet"
+    )
+
+
+def test_hvfhv_yields_one_table_per_row_group_and_keeps_every_row():
+    download, _ = _download_row_groups(row_groups=3, rows_per_group=4)
+    tables = list(tlc.tlc_source(fetch=_fetch, download=download).resources["fhvhv_tripdata"])
+    assert [t.num_rows for t in tables] == [4, 4, 4]
+    assert pa.concat_tables(tables).column("PULocationID").to_pylist() == list(range(12))
+
+
+def test_hvfhv_loads_january_2024_only_whatever_the_months_setting(monkeypatch):
+    monkeypatch.setenv("SOURCES__TLC__MONTHS", '["2024-01", "2024-02", "2024-03"]')
+    download, urls = _download_row_groups(row_groups=1, rows_per_group=2)
+    source = tlc.tlc_source.clone(name="tlc", section="tlc")(fetch=_fetch, download=download)
+    list(source.resources["fhvhv_tripdata"])
+    assert tlc.HVFHV_MONTHS == ["2024-01"]
+    assert urls == [tlc.hvfhv_url("2024-01")]

@@ -9,6 +9,17 @@ models:
       - name: pickup_datetime
         tests: [not_null]
 
+  - name: stg_tlc__fhvhv_tripdata
+    description: >
+      High-volume for-hire (HVFHV) trip records, one row per bronze row:
+      renamed and typed. Not taxi trips, so nothing downstream unions them
+      with yellow and green.
+    access: protected
+    columns:
+      - name: pickup_datetime
+        tests: [not_null]
+      - name: pickup_location_id
+        tests: [not_null]
   - name: stg_tlc__green_tripdata
     description: >
       Green taxi trip records, one row per bronze row: renamed and typed. Carries

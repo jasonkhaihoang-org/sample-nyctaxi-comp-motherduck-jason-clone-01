@@ -27,3 +27,5 @@ This supersedes ADR 0001. Its reasoning for conforming still holds; what changed
 - [`models/staging/stg_tlc__yellow_tripdata.md`](../design/models/staging/stg_tlc__yellow_tripdata.md)
 - [`models/staging/stg_tlc__green_tripdata.md`](../design/models/staging/stg_tlc__green_tripdata.md)
 - [`models/intermediate/int_trips_enriched.md`](../design/models/intermediate/int_trips_enriched.md)
+- [`models/staging/stg_tlc__fhvhv_tripdata.md`](../design/models/staging/stg_tlc__fhvhv_tripdata.md)
+- [`models/agg/agg_hvfhv_trip_zone_daily.md`](../design/models/agg/agg_hvfhv_trip_zone_daily.md)

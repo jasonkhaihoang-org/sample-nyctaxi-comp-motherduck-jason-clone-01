@@ -32,6 +32,24 @@ models:
           - not_null
           - relationships: {arguments: {to: ref('dim_service_type'), field: service_type_key}}
 
+  - name: agg_hvfhv_trip_zone_daily
+    description: >
+      Daily HVFHV trip volume per pickup zone, keyed like agg_trip_zone_daily
+      so HVFHV volume reads beside taxi volume. Every HVFHV trip in the report
+      window counts, unknown zones included.
+    access: protected
+    columns:
+      - name: pickup_location_id
+        description: TLC location id of the pickup zone; the zone's natural key. Unknown zones are kept.
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
+      - name: pickup_date
+        description: Calendar date of the HVFHV pickup.
+        tests: [not_null]
+      - name: hvfhv_trip_count
+        description: HVFHV trips picked up in the zone on the day, every licensee combined.
+        tests: [not_null]
   - name: agg_trip_zone_daily
     description: >
       Daily zone demand with period-over-period context. The window functions are

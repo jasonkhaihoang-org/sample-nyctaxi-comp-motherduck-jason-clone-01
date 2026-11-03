@@ -35,6 +35,12 @@ sources:
         description: >
           Green (boro) taxi trips. Carries `ehail_fee` and `trip_type`,
           which yellow does not, and has no `Airport_fee`.
+      - name: fhvhv_tripdata
+        description: >
+          High-volume for-hire (HVFHV) trips, January 2024 only. Not taxi
+          trips: a base passenger fare and driver pay, and no vendor, rate
+          code or payment type, so they stay out of the conformed trips
+          (proposal 0001).
       - name: taxi_zone_lookup
         description: TLC zone reference as published. 265 rows.
 

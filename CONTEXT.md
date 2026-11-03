@@ -13,6 +13,10 @@ One completed taxi journey, as the TLC records it. A trip is identified by its n
 Which fleet carried the trip: yellow (medallion taxis) or green (boro taxis). Green may not pick up in the Manhattan core or at the airports except by pre-arrangement, so airport volume is overwhelmingly yellow.
 _Not_: vendor, because a vendor is the technology provider that supplies the meter and serves both fleets.
 
+**HVFHV trip**:
+One trip dispatched by a high-volume for-hire service licensee (an app-based service, such as Uber or Lyft), as the TLC publishes it in its HVFHV trip records. It is not a taxi trip: it carries a base passenger fare and driver pay and no meter, vendor, rate code or payment type, so its fares are not comparable with taxi fares and its volume is reported beside taxi volume, not inside it.
+_Not_: trip, because a trip here is a yellow or green taxi journey; HVFHV trips stay out of the conformed trip grain (proposal 0001).
+
 **Zone**:
 A TLC taxi zone: the area a trip starts or ends in. Zones belong to a borough.
 

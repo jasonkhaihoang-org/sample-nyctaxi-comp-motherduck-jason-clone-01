@@ -26,3 +26,39 @@ unit_tests:
         - {pickup_location_id: 1, revenue_rank_that_day: 1}
         - {pickup_location_id: 2, revenue_rank_that_day: 1}
         - {pickup_location_id: 3, revenue_rank_that_day: 3}
+
+  # --- agg_hvfhv_trip_zone_daily: report window, grain, unknown zones ---------
+  - name: hvfhv_trip_zone_daily_keeps_only_the_report_window
+    description: The window is half-open, as in_report_window gives it, so a trip at report_start counts and one at report_end does not.
+    model: agg_hvfhv_trip_zone_daily
+    overrides:
+      vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
+    given:
+      - input: ref('stg_tlc__fhvhv_tripdata')
+        rows:
+          - {pickup_location_id: 1, pickup_datetime: '2023-12-31 23:59:59'}
+          - {pickup_location_id: 1, pickup_datetime: '2024-01-01 00:00:00'}
+          - {pickup_location_id: 1, pickup_datetime: '2024-03-31 23:59:59'}
+          - {pickup_location_id: 1, pickup_datetime: '2024-04-01 00:00:00'}
+    expect:
+      rows:
+        - {pickup_location_id: 1, pickup_date: '2024-01-01', hvfhv_trip_count: 1}
+        - {pickup_location_id: 1, pickup_date: '2024-03-31', hvfhv_trip_count: 1}
+
+  - name: hvfhv_trip_zone_daily_counts_every_trip_per_zone_and_day
+    description: Trips are counted per pickup zone and pickup date, a trip at midnight starts the next day, and an unknown zone is kept as its own row.
+    model: agg_hvfhv_trip_zone_daily
+    overrides:
+      vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
+    given:
+      - input: ref('stg_tlc__fhvhv_tripdata')
+        rows:
+          - {pickup_location_id: 7, pickup_datetime: '2024-01-10 08:00:00'}
+          - {pickup_location_id: 7, pickup_datetime: '2024-01-10 23:59:59'}
+          - {pickup_location_id: 7, pickup_datetime: '2024-01-11 00:00:00'}
+          - {pickup_location_id: 264, pickup_datetime: '2024-01-10 12:00:00'}
+    expect:
+      rows:
+        - {pickup_location_id: 7, pickup_date: '2024-01-10', hvfhv_trip_count: 2}
+        - {pickup_location_id: 7, pickup_date: '2024-01-11', hvfhv_trip_count: 1}
+        - {pickup_location_id: 264, pickup_date: '2024-01-10', hvfhv_trip_count: 1}
