@@ -33,7 +33,19 @@ downtime as (
 )
 
 select
-    mo.*,
+    mo.month_start_date,
+    mo.vehicle_key,
+    mo.medallion_number,
+    mo.make_model,
+    mo.fuel_type,
+    mo.garage_key,
+    mo.active_days,
+    mo.shift_count,
+    mo.trip_count,
+    mo.online_hours,
+    mo.on_trip_hours,
+    mo.gross_revenue,
+    mo.paid_miles,
     coalesce(dt.down_days, 0) as down_days,
     coalesce(dt.maintenance_cost, 0) as maintenance_cost,
     date_diff(

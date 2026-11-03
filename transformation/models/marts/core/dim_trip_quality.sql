@@ -22,7 +22,18 @@ select
         is_unresolved_pickup_zone, is_undocumented_rate_code,
         is_missing_airport_fee
     )) as trip_quality_key,
-    *,
+    is_billable,
+    is_refund,
+    is_zero_distance,
+    is_implausibly_short,
+    is_implausibly_fast,
+    is_negative_duration,
+    is_zero_passenger,
+    is_missing_passenger_count,
+    is_sparse_vendor_feed,
+    is_unresolved_pickup_zone,
+    is_undocumented_rate_code,
+    is_missing_airport_fee,
     -- One rollup attribute so a report can say "clean" without listing twelve
     -- negations.
     (

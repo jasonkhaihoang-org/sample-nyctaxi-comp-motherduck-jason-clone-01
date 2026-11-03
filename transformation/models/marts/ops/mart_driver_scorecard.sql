@@ -27,7 +27,21 @@ with period as (
 )
 
 select
-    p.*,
+    p.driver_key,
+    p.driver_ref,
+    p.engagement_type,
+    p.garage_key,
+    p.home_garage_name,
+    p.active_days,
+    p.shift_count,
+    p.trip_count,
+    p.online_hours,
+    p.on_trip_hours,
+    p.gross_revenue,
+    p.tip_revenue,
+    p.total_cost,
+    p.total_margin,
+    p.paid_miles,
     {{ safe_divide('p.on_trip_hours', 'nullif(p.online_hours, 0)') }} as occupancy_rate,
     {{ safe_divide('p.gross_revenue', 'nullif(p.online_hours, 0)') }} as revenue_per_online_hour,
     {{ safe_divide('p.gross_revenue', 'nullif(p.trip_count, 0)') }} as revenue_per_trip,

@@ -7,7 +7,21 @@
 -- BETWEEN is inclusive at both ends and double-counts on a changeover date.
 with versioned as (
     select
-        z.*,
+        z.location_id,
+        z.borough_name,
+        z.zone_name,
+        z.tlc_service_zone,
+        z.zone_class,
+        z.demand_tier,
+        z.centroid_lat,
+        z.centroid_lon,
+        z.area_sq_mi,
+        z.resident_population,
+        z.is_airport_zone,
+        z.is_congestion_zone,
+        z.valid_from_date,
+        z.valid_to_date,
+        z.source_version,
         b.borough_code,
         b.reporting_region,
         b.is_nyc,
