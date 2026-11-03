@@ -1,4 +1,4 @@
-# NYC Taxi Analytics (nyc-taxi-duckdb-demo): Agent Conventions
+# NYC Taxi Analytics (nyc-taxi-motherduck-demo): Agent Conventions
 
 A DuckDB lakehouse for NYC taxi analytics: real TLC trip records, plus two simulated source systems (fleet operations and master data). Read [`CONTEXT.md`](CONTEXT.md) for the vocabulary.
 
@@ -49,6 +49,8 @@ Operator conventions are skills in `.agents/skills/`, and the agent's skill list
 
 ## Commands
 
+In a Studio Intent the plugin runs each pipeline on its Flight and dbt on the `dev` target against the Intent's Ephemeral MotherDuck database; the commands below are for a local checkout.
+
 ```bash
 python3 orchestration/run_all.py          # ingestion, then dbt build
 python3 orchestration/run_ingest.py       # dlt pipelines: tlc, ops, mdm
@@ -62,7 +64,7 @@ The command for each layer's tests is in `test-map.json`. Lint Python with `ruff
 
 ## Safety
 
-- The warehouse is `domain.duckdb` at the repo root. It is ignored by git and rebuilt by `orchestration/run_all.py`. Never commit it or downloaded data.
+- The Domain's warehouse is the MotherDuck database `sa_prd`, built by the Flights in `ingestion/` and `orchestration/`. A local `orchestration/run_all.py` writes `domain.duckdb` at the repo root instead; it is ignored by git and is never the Domain. Never commit it or downloaded data.
 - Never commit secrets. dlt reads them from the bound secret store.
 - Do not edit `transformation/profiles.yml` to make a failure pass.
 

@@ -9,19 +9,40 @@ models:
       Drivers below the hours floor are carried but flagged.
     columns:
       - name: driver_key
-        tests: [unique, not_null]
+        tests:
+          - unique
+          - not_null
+          - relationships: {arguments: {to: ref('dim_driver'), field: driver_key}}
       - name: is_below_ranking_floor
         tests: [not_null]
       - name: occupancy_rate
         description: '{{ doc("occupancy_rate") }}'
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
   - name: mart_vehicle_utilisation
     description: Asset utilisation for the period with downtime netted out.
     columns:
       - name: vehicle_key
-        tests: [unique, not_null]
+        tests:
+          - unique
+          - not_null
+          - relationships: {arguments: {to: ref('dim_vehicle'), field: vehicle_key}}
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
   - name: mart_trip_quality_scorecard
     description: >
       What proportion of the feed is trustworthy and whose records are not.
       Aggregated through the junk dimension so every verdict is groupable.
+    columns:
+      - name: trip_month
+        tests: [not_null]
+      - name: vendor_id
+        tests: [not_null]
+      - name: service_type_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_service_type'), field: service_type_key}}

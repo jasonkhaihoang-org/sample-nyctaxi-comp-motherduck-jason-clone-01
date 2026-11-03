@@ -22,7 +22,7 @@ select
     v.fuel_type,
     v.fuel_type in ('hybrid', 'electric') as is_low_emission,
     v.wheelchair_accessible,
-    v.garage_key_src as garage_key,
+    v.garage_id as garage_key,
     g.garage_name,
     v.in_service_date,
     v.retired_date,
@@ -30,6 +30,6 @@ select
     coalesce(d.maintenance_events, 0) as maintenance_events,
     coalesce(d.maintenance_down_days, 0) as maintenance_down_days,
     coalesce(d.maintenance_cost_usd, 0) as maintenance_cost_usd
-from (select *, garage_id as garage_key_src from {{ ref('stg_ops__vehicles') }}) v
-left join {{ ref('stg_ops__garages') }} g on v.garage_key_src = g.garage_id
+from {{ ref('stg_ops__vehicles') }} v
+left join {{ ref('stg_ops__garages') }} g on v.garage_id = g.garage_id
 left join downtime d on v.vehicle_id = d.vehicle_id

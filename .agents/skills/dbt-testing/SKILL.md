@@ -7,7 +7,7 @@ description: "Use when writing, changing or running dbt tests, unit tests or Pyt
 
 ## Generic tests (C1)
 
-- Every primary key has `unique` and `not_null`.
+- Every primary key has `unique` and `not_null`. A grain of several columns has `not_null` on each of them and a singular test that it is unique (`assert_<model>_one_row_per_<grain>`). No test uses a `dbt_utils` macro: `packages.yml` does not declare `dbt_utils`, which is installed only as `dbt_project_evaluator`'s dependency.
 - Every foreign key to a conformed dimension has `relationships`.
 - A column with a closed set of values has `accepted_values`.
 
@@ -29,7 +29,7 @@ DuckDB float aggregation is not reproducible bit for bit: two builds of the same
 
 ## Unit tests (C5)
 
-A model needs a unit test when its logic has a branch a reviewer could get wrong: ordering and tie-breaks, deduplication, and state classification. Today: `int_status_intervals`, `int_trips_enriched`, `int_trips_conformed`. Unit tests live in `_unit_tests.yml` beside the model.
+A model needs a unit test when its logic has a branch a reviewer could get wrong: ordering and tie-breaks, deduplication, and state classification. Today: `int_status_intervals`, `int_trips_enriched`, `int_trips_conformed`, and the rankings in `mart_driver_scorecard` and `agg_trip_zone_daily`. Unit tests live in `_unit_tests.yml` beside the model.
 
 Run data tests and unit tests as separate commands. The command for each layer is in `test-map.json`.
 

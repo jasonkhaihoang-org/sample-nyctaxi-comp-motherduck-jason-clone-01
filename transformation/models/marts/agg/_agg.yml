@@ -15,17 +15,53 @@ models:
         description: '{{ doc("measurable_tip_rate") }}'
       - name: trip_count
         tests: [not_null]
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
+      - name: day_of_week
+        tests: [not_null]
+      - name: is_non_working_day
+        tests: [not_null]
+      - name: daypart_code
+        tests: [not_null]
+      - name: is_peak
+        tests: [not_null]
+      - name: service_type_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_service_type'), field: service_type_key}}
 
   - name: agg_trip_zone_daily
     description: >
       Daily zone demand with period-over-period context. The window functions are
       the point: a raw count answers "how many", the lag and rolling average
-      answer "is that normal".
+      answer "is that normal". `revenue_rank_that_day` ranks revenue at the cent,
+      so two zones that took the same money share a rank.
+    columns:
+      - name: pickup_date
+        tests: [not_null]
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
+      - name: pickup_date_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_date'), field: date_key}}
 
   - name: agg_od_flow_matrix
     description: >
       Origin-to-destination flow -- the same zone dimension joined twice, in both
       roles. Published only for pairs with at least 25 billable trips (ADR 0017).
+    columns:
+      - name: origin_location_id
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
+      - name: dest_location_id
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
 
   - name: agg_trip_band_profile
     description: >
@@ -35,6 +71,21 @@ models:
       a refund or a negative duration falls outside every band and appears once
       as 'unbanded' (order 0), so the profile covers every in-window trip and
       sum(trip_count) equals fct_trip's count.
+    columns:
+      - name: distance_band
+        tests: [not_null]
+      - name: duration_band
+        tests: [not_null]
+      - name: fare_band
+        tests: [not_null]
+      - name: service_type_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_service_type'), field: service_type_key}}
+      - name: pickup_borough
+        tests: [not_null]
+      - name: daypart_code
+        tests: [not_null]
 
   - name: agg_weather_demand_daily
     description: >
@@ -44,6 +95,11 @@ models:
       keeps its row with null weather (ADR 0012) instead of disappearing. Trips
       are attributed through their own zone surrogate, the version resolved as of
       the trip's date (ADR 0009), not the borough's current version.
+    columns:
+      - name: obs_date
+        tests: [not_null]
+      - name: borough_name
+        tests: [not_null]
 
   - name: agg_driver_daily
     description: >
@@ -53,12 +109,34 @@ models:
     columns:
       - name: occupancy_rate
         description: '{{ doc("occupancy_rate") }}'
+      - name: shift_date
+        tests: [not_null]
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_driver'), field: driver_key}}
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
+      - name: date_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_date'), field: date_key}}
 
   - name: agg_driver_monthly
     description: >
       Driver-month, built from driver-day rather than from shifts again. Each
       level is built from the one below so the pyramid cannot disagree with
       itself.
+    columns:
+      - name: month_start_date
+        tests: [not_null]
+      - name: driver_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_driver'), field: driver_key}}
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
   - name: agg_vehicle_daily
     description: >
@@ -66,18 +144,57 @@ models:
       against the 24-hour day, not against sign-on time -- a medallion idle in the
       depot is the asset question, a driver idle on the road is the labour
       question, and they are different numbers.
+    columns:
+      - name: shift_date
+        tests: [not_null]
+      - name: vehicle_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_vehicle'), field: vehicle_key}}
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
+      - name: date_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_date'), field: date_key}}
 
   - name: agg_vehicle_monthly
     description: >
       Vehicle-month with maintenance downtime netted out of the denominator. A
       vehicle in the shop for six days has 24 fewer available days, and charging
       it with those days makes a well-run asset look idle.
+    columns:
+      - name: month_start_date
+        tests: [not_null]
+      - name: vehicle_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_vehicle'), field: vehicle_key}}
+      - name: garage_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
   - name: agg_garage_monthly
     description: Garage-month. The top of the driver, vehicle and garage pyramid.
+    columns:
+      - name: month_start_date
+        tests: [not_null]
+      - name: garage_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_garage'), field: garage_key}}
 
   - name: agg_zone_occupancy_hourly
     description: >
       Where the fleet spends its time, by zone and hour, from the status stream
       rather than from trips. The gap between this map and the revenue map is the
       whole reason occupancy is collected.
+    columns:
+      - name: interval_date
+        tests: [not_null]
+      - name: interval_hour
+        tests: [not_null]
+      - name: location_id
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}

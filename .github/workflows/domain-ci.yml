@@ -1,4 +1,4 @@
-# PR validation through the Domain CI engine (jasonkhaihoang-org/domain-cicd sandbox copy, VD-7576).
+# PR validation through the Domain CI engine (accelerate-data/domain-cicd).
 name: Domain CI
 
 on:

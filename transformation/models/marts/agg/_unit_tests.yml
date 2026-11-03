@@ -1,0 +1,28 @@
+version: 2
+
+unit_tests:
+  # --- agg_trip_zone_daily: revenue rank at the cent --------------------------
+  - name: trip_zone_daily_ranks_revenue_at_the_cent
+    description: >
+      Zones are ranked on the day's revenue rounded to the cent, so two zones whose summed
+      doubles differ below a cent share a rank, and the next zone's rank is skipped.
+    model: agg_trip_zone_daily
+    overrides:
+      vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
+    given:
+      - input: ref('fct_trip')
+        rows:
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 08:00:00', total_amount: 60.003}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 09:00:00', total_amount: 40.001}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z2, pickup_datetime: '2024-01-10 10:00:00', total_amount: 100.001}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z3, pickup_datetime: '2024-01-10 11:00:00', total_amount: 60.0}
+      - input: ref('dim_zone')
+        rows:
+          - {zone_key: z1, zone_natural_key: 1, zone_name: A, borough_name: Queens}
+          - {zone_key: z2, zone_natural_key: 2, zone_name: B, borough_name: Queens}
+          - {zone_key: z3, zone_natural_key: 3, zone_name: C, borough_name: Queens}
+    expect:
+      rows:
+        - {pickup_location_id: 1, revenue_rank_that_day: 1}
+        - {pickup_location_id: 2, revenue_rank_that_day: 1}
+        - {pickup_location_id: 3, revenue_rank_that_day: 3}

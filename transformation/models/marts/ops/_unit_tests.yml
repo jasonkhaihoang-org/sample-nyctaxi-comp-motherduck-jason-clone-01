@@ -1,0 +1,25 @@
+version: 2
+
+unit_tests:
+  # --- mart_driver_scorecard: ranking on revenue per online hour --------------
+  - name: driver_scorecard_ranks_on_the_period_rate_with_ties_sharing_a_rank
+    description: >
+      Drivers are ranked on revenue per online hour summed over the period, descending,
+      fleet-wide and within garage. Equal rates share a rank and the next rank is skipped;
+      a driver with no online hours has no rate and ranks last; a driver under 40 online
+      hours is flagged, not dropped.
+    model: mart_driver_scorecard
+    given:
+      - input: ref('agg_driver_monthly')
+        rows:
+          - {driver_key: 1, garage_key: 1, gross_revenue: 500.0, online_hours: 50.0}
+          - {driver_key: 2, garage_key: 1, gross_revenue: 500.0, online_hours: 50.0}
+          - {driver_key: 2, garage_key: 1, gross_revenue: 500.0, online_hours: 50.0}
+          - {driver_key: 3, garage_key: 2, gross_revenue: 600.0, online_hours: 50.0}
+          - {driver_key: 4, garage_key: 2, gross_revenue: 100.0, online_hours: 0.0}
+    expect:
+      rows:
+        - {driver_key: 1, fleet_rank: 2, garage_rank: 1, is_below_ranking_floor: false}
+        - {driver_key: 2, fleet_rank: 2, garage_rank: 1, is_below_ranking_floor: false}
+        - {driver_key: 3, fleet_rank: 1, garage_rank: 1, is_below_ranking_floor: false}
+        - {driver_key: 4, fleet_rank: 4, garage_rank: 2, is_below_ranking_floor: true}

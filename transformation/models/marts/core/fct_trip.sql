@@ -24,7 +24,37 @@
 --    consumer to infer it from a null.
 
 with trips as (
-    select * from {{ ref('int_trips_enriched') }}
+    select
+        trip_key,
+        service_type,
+        vendor_id,
+        pickup_datetime,
+        dropoff_datetime,
+        pickup_date,
+        pickup_hour,
+        pickup_location_id,
+        dropoff_location_id,
+        rate_code_id,
+        payment_type,
+        passenger_count,
+        store_and_fwd_flag,
+        trip_distance,
+        fare_amount,
+        extra,
+        mta_tax,
+        tip_amount,
+        tolls_amount,
+        improvement_surcharge,
+        congestion_surcharge,
+        total_amount,
+        trip_seconds,
+        avg_mph,
+        _dlt_load_id,
+        airport_fee,
+        ehail_fee,
+        trip_type,
+        airport_fee_status
+    from {{ ref('int_trips_enriched') }}
     {% if is_incremental() %}
     where pickup_datetime > (select coalesce(max(pickup_datetime), '1900-01-01') from {{ this }})
     {% endif %}
