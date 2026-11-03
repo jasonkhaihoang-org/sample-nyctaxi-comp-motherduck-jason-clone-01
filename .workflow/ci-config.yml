@@ -1,4 +1,4 @@
-# Domain CI Configuration — MotherDuck (rung 6 validation copy)
+# Domain CI Configuration — MotherDuck
 VD_DOMAIN_DATA_PLATFORM: motherduck
 VD_DOMAIN_SLUG: nyc-taxi-motherduck-demo
 VD_DOMAIN_SCHEMA: main

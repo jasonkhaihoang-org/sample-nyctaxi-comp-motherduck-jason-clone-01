@@ -1,6 +1,6 @@
 # Publish the production manifest PR CI reads as production state (VD-7576): on a push to main, the engine
 # parses the dbt project for production and publishes the `dbt-manifest-<sha>` release plus the manifests on
-# `dbt-docs-latest`. Calls the jasonkhaihoang-org engine copy, as this org's other model-answer repos do.
+# `dbt-docs-latest`. Calls the accelerate-data/domain-cicd engine.
 # The dbt Docs site stays with publish-dbt-docs.yml, which uploads only static_index.html to the same release.
 name: Publish Prod Manifest
 

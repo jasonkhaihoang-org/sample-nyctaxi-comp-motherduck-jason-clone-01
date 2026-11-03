@@ -1,5 +1,5 @@
 # Code owners. CI reads this file from the base branch to decide who may accept with ci-accept.
-* @jasonkhaihoang
+* @accelerate-data/vibedata-engineering
 
 # Team-only line: resolves to no person, so preflight warns (VD-7512).
 /repo-map.json @accelerate-data/vibedata-engineering

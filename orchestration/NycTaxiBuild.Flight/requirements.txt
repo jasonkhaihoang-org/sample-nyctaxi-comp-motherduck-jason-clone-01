@@ -32,15 +32,11 @@ dbt-common==1.39.0
     #   dbt-duckdb
 dbt-core==1.12.5
     # via
-    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
-    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dbt.in
     #   dbt-duckdb
 dbt-core-experimental-parser==2.0.8
     # via dbt-core
 dbt-duckdb==1.11.0
     # via
-    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
-    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dbt.in
 dbt-extractor==0.6.0
     # via dbt-core
 dbt-protos==1.0.615
@@ -52,8 +48,6 @@ deepdiff==8.6.2
     # via dbt-common
 duckdb==1.5.6
     # via
-    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
-    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dbt.in
     #   dbt-duckdb
 idna==3.20
     # via requests
@@ -183,7 +177,5 @@ urllib3==2.8.0
     # via requests
 vibedata-motherduck-flight==0.1.0
     # via
-    #   -c /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/md-constraints.txt
-    #   -r /private/tmp/claude-501/-Users-jasonkhaihoang-orca-workspaces-domain-cicd-VD-7575/0593651f-98df-4517-8f92-dd0461456c6c/scratchpad/dbt.in
 zipp==4.1.2
     # via importlib-metadata
