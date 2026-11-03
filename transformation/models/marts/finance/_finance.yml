@@ -13,6 +13,7 @@ models:
       - name: pickup_location_id
         tests:
           - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
+          - not_null
 
   - name: mart_monthly_service_summary
     description: Monthly volume and revenue by fleet and payment method.
@@ -22,6 +23,9 @@ models:
       - name: service_type
         tests:
           - accepted_values: {arguments: {values: ['yellow', 'green']}}
+          - not_null
+      - name: payment_method_name
+        tests: [not_null]
 
   - name: mart_revenue_component_bridge
     description: >
@@ -30,4 +34,12 @@ models:
       non-zero the walk does not balance, and that is a finding about the source.
     columns:
       - name: component_name
+        tests: [not_null]
+      - name: trip_month
+        tests: [not_null]
+      - name: service_type_key
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_service_type'), field: service_type_key}}
+      - name: borough_name
         tests: [not_null]

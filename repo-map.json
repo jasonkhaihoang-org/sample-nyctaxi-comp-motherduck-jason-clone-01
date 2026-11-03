@@ -38,7 +38,7 @@
   "test_frameworks": [
     {
       "name": "dbt tests",
-      "scope": "Generic tests in _*.yml, singular tests in transformation/tests/, unit tests in models/intermediate/_unit_tests.yml.",
+      "scope": "Generic tests in _*.yml, singular tests in transformation/tests/, unit tests in _unit_tests.yml beside the models they cover (intermediate, agg, ops).",
       "config_files": [
         "test-map.json"
       ]
