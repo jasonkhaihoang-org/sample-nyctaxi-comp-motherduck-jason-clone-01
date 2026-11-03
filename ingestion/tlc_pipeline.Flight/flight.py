@@ -13,7 +13,7 @@ from vibedata.dlt.core.providers.flight_secrets import register_flight_secrets_p
 from vibedata.dlt.duckdb_core import finalize
 from vibedata.flight import checkout
 
-GIT_REPO = "jasonkhaihoang-org/sample-nyctaxi-comp-motherduck"
+GIT_REPO = "accelerate-data/sample-nyctaxi-comp-motherduck-jason-clone"
 GIT_REF = os.environ["GIT_REF"]
 PROJECT_SUBDIR = "ingestion"
 GIT_SECRET_NAME = "nyc_taxi_motherduck_demo_git_auth"
