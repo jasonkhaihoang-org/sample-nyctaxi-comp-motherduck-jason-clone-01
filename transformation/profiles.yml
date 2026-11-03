@@ -1,9 +1,10 @@
 # In a Studio Intent the runtime supplies its own profile (DBT_PROFILE_NAME,
-# DBT_PROFILES_DIR) and this file is not read. `dev` reads a DuckDB file from
-# VD_EPHM_DUCKDB_LOCAL_PATH; `flight` is what the dbt Flight and
-# orchestration/run_transform.py build under.
+# DBT_PROFILES_DIR) and this file is not read. `flight`, the default, is what
+# every dbt Flight and orchestration/run_transform.py build under: the plugin's
+# flight-dbt.py template passes no --target. `dev` reads a local DuckDB file from
+# VD_EPHM_DUCKDB_LOCAL_PATH.
 nyc_taxi_analytics:
-  target: dev
+  target: flight
   outputs:
     dev:
       type: duckdb

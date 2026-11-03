@@ -48,7 +48,7 @@ Profile a remote source file once per intent: row count, columns and types, null
 A source is registered in two things an agent cannot derive from the code: its artifacts in `repo-map.json` `sources`, and the runner declared in `repo-map.json` `orchestrators`.
 
 - A new source mirrors an existing entry in `repo-map.json` `sources`: create every artifact it lists (module, config section, pipeline, resource docs, tests, design record). Mirror `tlc` for a downloaded file source.
-- Mirror `tlc.py` for a large file: it yields pyarrow tables per parquet row group, which is proven on three months of TLC data.
+- Mirror `tlc.py` for a monthly file that fits in memory: it yields one pyarrow table per monthly Parquet file, which is proven on three months of yellow and green trips. A file too large to hold whole (tens of millions of rows a month) is streamed to a temporary file and read one Parquet row group at a time, so memory holds one row group, never the file.
 - Sources are custom modules under `ingestion/sources/`, registered as `[sources.<name>]` with `connector = "custom"` and `connector_source = "local"`. The connector catalog is not used.
 - Add the source name to its runner's `orchestrators.<name>.runs`, and to that runner's own code (`orchestration/run_ingest.py`). `runs` is the set, never the order: the runner's `PIPELINES` list holds the order, and its test asserts that list.
 - `produces` names the tables a source lands, and is needed only once a second source shares its `dataset`. While one source owns the dataset, its module's resources are the list; declare `produces` on both as soon as the dataset is shared, because a table's producer is otherwise ambiguous.

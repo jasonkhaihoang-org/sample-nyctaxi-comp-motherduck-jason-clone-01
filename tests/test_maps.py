@@ -156,10 +156,12 @@ def test_test_map_paths_exist():
 
 
 DBT_PROJECT = ROOT / "transformation"
-# The repo's own profile, named explicitly: in the Studio sandbox DBT_PROFILES_DIR and
-# DBT_PROFILE_NAME point at the runtime profile, which plain `dbt ls` would otherwise use.
+# The repo's own profile and its local target, named explicitly: in the Studio sandbox
+# DBT_PROFILES_DIR and DBT_PROFILE_NAME point at the runtime profile, which plain `dbt ls`
+# would otherwise use, and the profile's default target is the Flights' MotherDuck one,
+# which these offline tests must never open.
 DBT = [sys.executable, "-m", "dbt.cli.main"]
-DBT_PROFILE = ["--profiles-dir", str(DBT_PROJECT), "--profile", "nyc_taxi_analytics"]
+DBT_PROFILE = ["--profiles-dir", str(DBT_PROJECT), "--profile", "nyc_taxi_analytics", "--target", "dev"]
 # The profile reads its path from the sandbox variable; parsing never opens the file.
 DBT_ENV = {**os.environ, "VD_EPHM_DUCKDB_LOCAL_PATH": str(ROOT / "domain.duckdb")}
 

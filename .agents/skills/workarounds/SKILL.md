@@ -15,7 +15,7 @@ Remove when: the `planning`, `executing-the-plan` and `verifying` skills write t
 
 ## Run dbt in the sandbox
 
-The repo's `transformation/profiles.yml` has `domain` and `slice` targets for local and CI use. Do not open it, or `~/.dbt/profiles.yml`, for any reason: not to work out how to run dbt, and not for the shipping contract check, which has nothing to read on this platform (no contracts are published for `duckdb_local`). The runtime provides the profile (`DBT_PROFILES_DIR`, `DBT_PROFILE_NAME`) and one target, `dev`, which writes the sandbox file. Run dbt through the runtime wrapper from `transformation/`:
+The repo's `transformation/profiles.yml` has a `flight` target, the default, which every dbt Flight builds under, and a `dev` target for a local checkout. Do not open it, or `~/.dbt/profiles.yml`, to work out how to run dbt in an Intent, and not for the shipping contract check, which has nothing to read in this repo (it publishes no data contracts). The runtime provides the profile (`DBT_PROFILES_DIR`, `DBT_PROFILE_NAME`) and one target, `dev`, which writes the Intent's Ephemeral MotherDuck database. Run dbt through the runtime wrapper from `transformation/`:
 
 ```bash
 cd transformation && <plugin>/scripts/vd-intent-context-run.sh "dbt <command> --target dev"
