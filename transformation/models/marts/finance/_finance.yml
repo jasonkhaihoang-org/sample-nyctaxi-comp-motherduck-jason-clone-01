@@ -5,6 +5,7 @@ models:
     description: >
       Daily revenue by pickup zone. The billable rule (ADR 0003) is applied
       here and nowhere upstream.
+    access: protected
     columns:
       - name: trip_date
         tests: [not_null]
@@ -14,9 +15,27 @@ models:
         tests:
           - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
           - not_null
+      - name: congestion_surcharge_revenue
+        description: >
+          Congestion surcharges recorded on the zone-day's billable trips; a trip
+          with none recorded adds nothing. Already included in surcharge_revenue.
+        tests: [not_null]
+      - name: congestion_surcharge_trip_count
+        description: Billable trips that carry a congestion surcharge (above zero).
+        tests: [not_null]
+      - name: airport_fee_revenue
+        description: >
+          Airport fees recorded on the zone-day's billable trips; a trip with none
+          recorded (a missing yellow fee, or any green trip) adds nothing. Not part
+          of surcharge_revenue.
+        tests: [not_null]
+      - name: airport_fee_trip_count
+        description: Billable trips that carry an airport fee (above zero).
+        tests: [not_null]
 
   - name: mart_monthly_service_summary
     description: Monthly volume and revenue by fleet and payment method.
+    access: protected
     columns:
       - name: trip_month
         tests: [not_null]
@@ -25,6 +44,17 @@ models:
           - accepted_values: {arguments: {values: ['yellow', 'green']}}
           - not_null
       - name: payment_method_name
+        tests: [not_null]
+      - name: avg_measurable_tip_rate
+        description: >
+          Mean measurable tip rate over the row's trips where it is measurable
+          (ADR 0016's exception; ADR 0011). Null when the payment method records
+          no tips.
+      - name: measurable_tip_trip_count
+        description: Trips whose tip rate is measurable.
+        tests: [not_null]
+      - name: tip_measurable_share
+        description: measurable_tip_trip_count over all the row's trips.
         tests: [not_null]
 
   - name: mart_revenue_component_bridge

@@ -119,11 +119,16 @@
         "transformation/tests/assert_mart_revenue_component_bridge_one_row_per_component_month.sql"
       ],
       "selectors": {
-        "data": "path:models/marts/finance"
+        "data": "path:models/marts/finance",
+        "unit": "path:models/marts/finance"
       },
       "commands": {
-        "data": "cd transformation && dbt test --select path:models/marts/finance --exclude test_type:unit"
-      }
+        "data": "cd transformation && dbt test --select path:models/marts/finance --exclude test_type:unit",
+        "unit": "cd transformation && dbt test --select path:models/marts/finance,test_type:unit"
+      },
+      "unit": [
+        "transformation/models/marts/finance/_unit_tests.yml"
+      ]
     },
     "ops": {
       "sources": [

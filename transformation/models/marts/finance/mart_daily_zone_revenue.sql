@@ -12,6 +12,13 @@ select
     sum(f.fare_amount) as fare_revenue,
     sum(f.tip_amount) as tip_revenue,
     sum(f.total_surcharges) as surcharge_revenue,
+    -- Beside surcharge_revenue, not a partition of it: that total already holds the
+    -- congestion surcharge and never the airport fee. A missing value adds nothing,
+    -- and the trip counts say how many trips the totals rest on.
+    sum(coalesce(f.congestion_surcharge, 0)) as congestion_surcharge_revenue,
+    sum(case when f.congestion_surcharge > 0 then 1 else 0 end) as congestion_surcharge_trip_count,
+    sum(coalesce(f.airport_fee, 0)) as airport_fee_revenue,
+    sum(case when f.airport_fee > 0 then 1 else 0 end) as airport_fee_trip_count,
     sum(f.tolls_amount) as toll_revenue,
     sum(f.total_amount) as total_revenue
 from {{ ref('fct_trip') }} f

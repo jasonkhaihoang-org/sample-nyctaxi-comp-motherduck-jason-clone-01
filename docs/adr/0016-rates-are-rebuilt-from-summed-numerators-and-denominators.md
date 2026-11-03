@@ -23,3 +23,4 @@ Every rate that aggregates shift-level measures (occupancy rate, revenue per onl
 - [`models/agg/agg_driver_daily.md`](../design/models/agg/agg_driver_daily.md)
 - [`models/core/fct_shift.md`](../design/models/core/fct_shift.md)
 - [`models/ops/mart_driver_scorecard.md`](../design/models/ops/mart_driver_scorecard.md)
+- [`models/finance/mart_monthly_service_summary.md`](../design/models/finance/mart_monthly_service_summary.md)

@@ -11,7 +11,15 @@ select
     sum(f.trip_distance) as total_miles,
     sum(f.total_amount) as total_revenue,
     avg(f.total_amount) as avg_fare,
-    sum(f.total_amount * p.processor_fee_pct) as est_processor_fees
+    sum(f.total_amount * p.processor_fee_pct) as est_processor_fees,
+    -- The one rate that is a mean, not a ratio of sums (ADR 0016's exception): the
+    -- trip-level rate is null where the method records no tip (ADR 0011), so the mean
+    -- covers measurable trips only and their count and share are published beside it.
+    avg(f.measurable_tip_rate) as avg_measurable_tip_rate,
+    count(f.measurable_tip_rate) as measurable_tip_trip_count,
+    {{ safe_divide(
+        'cast(count(f.measurable_tip_rate) as double)',
+        'cast(count(*) as double)') }} as tip_measurable_share
 from {{ ref('fct_trip') }} f
 join {{ ref('dim_payment_method') }} p on f.payment_method_key = p.payment_method_key
 where

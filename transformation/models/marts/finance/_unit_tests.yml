@@ -1,0 +1,53 @@
+version: 2
+
+unit_tests:
+  # --- mart_daily_zone_revenue: missing fees and surcharges, and the trip counts ---
+  - name: daily_zone_revenue_sums_recorded_fees_and_counts_trips_that_carry_one
+    description: >
+      A trip with no recorded airport fee or congestion surcharge adds nothing to
+      its revenue and is not counted; a zero fee is summed but not counted. A
+      zone-day where no trip records the fee reads 0, not null.
+    model: mart_daily_zone_revenue
+    overrides:
+      vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
+    given:
+      - input: ref('fct_trip')
+        rows:
+          - {pickup_date: '2024-01-05', pickup_datetime: '2024-01-05 08:00:00', pickup_zone_key: 1, is_billable: true, fare_amount: 10.0, tip_amount: 2.0, total_surcharges: 3.5, tolls_amount: 0.0, total_amount: 15.5, congestion_surcharge: 2.5, airport_fee: 1.75}
+          - {pickup_date: '2024-01-05', pickup_datetime: '2024-01-05 09:00:00', pickup_zone_key: 1, is_billable: true, fare_amount: 12.0, tip_amount: 0.0, total_surcharges: 1.0, tolls_amount: 0.0, total_amount: 13.0, congestion_surcharge: null, airport_fee: null}
+          - {pickup_date: '2024-01-05', pickup_datetime: '2024-01-05 10:00:00', pickup_zone_key: 1, is_billable: true, fare_amount: 8.0, tip_amount: 1.0, total_surcharges: 1.0, tolls_amount: 0.0, total_amount: 10.0, congestion_surcharge: 0.0, airport_fee: 0.0}
+          - {pickup_date: '2024-01-05', pickup_datetime: '2024-01-05 11:00:00', pickup_zone_key: 2, is_billable: true, fare_amount: 9.0, tip_amount: 0.0, total_surcharges: 3.5, tolls_amount: 0.0, total_amount: 12.5, congestion_surcharge: 2.5, airport_fee: null}
+      - input: ref('dim_zone')
+        rows:
+          - {zone_key: 1, zone_natural_key: 132, borough_name: Queens, zone_name: JFK Airport, reporting_region: Airports}
+          - {zone_key: 2, zone_natural_key: 161, borough_name: Manhattan, zone_name: Midtown Center, reporting_region: Manhattan Core}
+    expect:
+      rows:
+        - {pickup_location_id: 132, trip_count: 3, surcharge_revenue: 5.5, congestion_surcharge_revenue: 2.5, congestion_surcharge_trip_count: 1, airport_fee_revenue: 1.75, airport_fee_trip_count: 1}
+        - {pickup_location_id: 161, trip_count: 1, surcharge_revenue: 3.5, congestion_surcharge_revenue: 2.5, congestion_surcharge_trip_count: 1, airport_fee_revenue: 0.0, airport_fee_trip_count: 0}
+
+  # --- mart_monthly_service_summary: the measurable tip rate, its count and share ---
+  - name: monthly_service_summary_tip_rate_is_a_mean_over_measurable_trips
+    description: >
+      A trip whose tip rate is null is left out of the mean and of the measurable
+      count but counts in the share's denominator. A payment method with no
+      measurable trip gets a null rate and a share of 0. The rates are exact in
+      binary, so the mean compares exactly (dbt-testing, Comparing values).
+    model: mart_monthly_service_summary
+    overrides:
+      vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
+    given:
+      - input: ref('fct_trip')
+        rows:
+          - {pickup_datetime: '2024-01-05 08:00:00', service_type_key: yellow, payment_method_key: 1, is_billable: true, trip_distance: 1.0, total_amount: 10.0, measurable_tip_rate: 0.25}
+          - {pickup_datetime: '2024-01-06 08:00:00', service_type_key: yellow, payment_method_key: 1, is_billable: true, trip_distance: 1.0, total_amount: 10.0, measurable_tip_rate: 0.75}
+          - {pickup_datetime: '2024-01-07 08:00:00', service_type_key: yellow, payment_method_key: 1, is_billable: true, trip_distance: 1.0, total_amount: 10.0, measurable_tip_rate: null}
+          - {pickup_datetime: '2024-01-08 08:00:00', service_type_key: yellow, payment_method_key: 2, is_billable: true, trip_distance: 1.0, total_amount: 10.0, measurable_tip_rate: null}
+      - input: ref('dim_payment_method')
+        rows:
+          - {payment_method_key: 1, payment_method_name: Credit card, settlement_class: receivable, counts_as_revenue: true, processor_fee_pct: 0.03}
+          - {payment_method_key: 2, payment_method_name: Cash, settlement_class: cash, counts_as_revenue: true, processor_fee_pct: 0.0}
+    expect:
+      rows:
+        - {payment_method_name: Credit card, trip_count: 3, avg_measurable_tip_rate: 0.5, measurable_tip_trip_count: 2, tip_measurable_share: 0.6666666666666666}
+        - {payment_method_name: Cash, trip_count: 1, avg_measurable_tip_rate: null, measurable_tip_trip_count: 0, tip_measurable_share: 0.0}

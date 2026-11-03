@@ -137,7 +137,11 @@ select
     a.trip_date as trips_to_date__day,
     a.pickup_location_id as trips_to_pickup_zone__zone,
     sum(a.trip_count) as billable_trip_count,
-    sum(a.total_revenue) as billable_revenue
+    sum(a.total_revenue) as billable_revenue,
+    sum(a.congestion_surcharge_revenue) as billable_congestion_surcharge_revenue,
+    sum(a.congestion_surcharge_trip_count) as billable_congestion_surcharge_trip_count,
+    sum(a.airport_fee_revenue) as billable_airport_fee_revenue,
+    sum(a.airport_fee_trip_count) as billable_airport_fee_trip_count
 from {{ ref('mart_daily_zone_revenue') }} as a
 group by 1, 2
 ),
@@ -147,7 +151,11 @@ select
     d0.calendar_date as trips_to_date__day,
     d1.zone_natural_key as trips_to_pickup_zone__zone,
     SUM(CASE WHEN (f.is_billable) THEN 1 ELSE 0 END) as billable_trip_count,
-    SUM(CASE WHEN (f.is_billable) THEN (f.total_amount) ELSE 0 END) as billable_revenue
+    SUM(CASE WHEN (f.is_billable) THEN (f.total_amount) ELSE 0 END) as billable_revenue,
+    SUM(CASE WHEN (f.is_billable) THEN COALESCE((f.congestion_surcharge), 0) ELSE 0 END) as billable_congestion_surcharge_revenue,
+    SUM(CASE WHEN (f.is_billable) AND (f.congestion_surcharge) > 0 THEN 1 ELSE 0 END) as billable_congestion_surcharge_trip_count,
+    SUM(CASE WHEN (f.is_billable) THEN COALESCE((f.airport_fee), 0) ELSE 0 END) as billable_airport_fee_revenue,
+    SUM(CASE WHEN (f.is_billable) AND (f.airport_fee) > 0 THEN 1 ELSE 0 END) as billable_airport_fee_trip_count
 from {{ ref('fct_trip') }} as f
 left join {{ ref('dim_date') }} as d0 on f.pickup_date_key = d0.date_key
 left join {{ ref('dim_zone') }} as d1 on f.pickup_zone_key = d1.zone_key
@@ -164,7 +172,8 @@ select
     a.service_type as trips_to_service_type__row,
     a.payment_method_name as trips_to_payment_method__payment_method,
     sum(a.trip_count) as billable_trip_count,
-    sum(a.total_revenue) as billable_revenue
+    sum(a.total_revenue) as billable_revenue,
+    sum(a.measurable_tip_trip_count) as billable_measurable_tip_trip_count
 from {{ ref('mart_monthly_service_summary') }} as a
 group by 1, 2, 3
 ),
@@ -175,7 +184,8 @@ select
     f.service_type_key as trips_to_service_type__row,
     d2.payment_method_name as trips_to_payment_method__payment_method,
     SUM(CASE WHEN (f.is_billable) THEN 1 ELSE 0 END) as billable_trip_count,
-    SUM(CASE WHEN (f.is_billable) THEN (f.total_amount) ELSE 0 END) as billable_revenue
+    SUM(CASE WHEN (f.is_billable) THEN (f.total_amount) ELSE 0 END) as billable_revenue,
+    SUM(CASE WHEN (f.is_billable) AND NOT (f.measurable_tip_rate) IS NULL THEN 1 ELSE 0 END) as billable_measurable_tip_trip_count
 from {{ ref('fct_trip') }} as f
 left join {{ ref('dim_date') }} as d0 on f.pickup_date_key = d0.date_key
 left join {{ ref('dim_payment_method') }} as d2 on f.payment_method_key = d2.payment_method_key
@@ -471,6 +481,38 @@ where ((coalesce(s.billable_revenue, 0) is null) <> (coalesce(d.billable_revenue
 
 union all
 
+select 'trips.LTS7_daily_zone_revenue.billable_congestion_surcharge_revenue at ' || coalesce(cast(coalesce(s.trips_to_date__day, d.trips_to_date__day) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_pickup_zone__zone, d.trips_to_pickup_zone__zone) as varchar), '') as binding,
+    cast(s.billable_congestion_surcharge_revenue as varchar) as source_value,
+    cast(d.billable_congestion_surcharge_revenue as varchar) as detail_value
+from s6_source as s full join s6_detail as d on s.trips_to_date__day is not distinct from d.trips_to_date__day and s.trips_to_pickup_zone__zone is not distinct from d.trips_to_pickup_zone__zone
+where ((coalesce(s.billable_congestion_surcharge_revenue, 0) is null) <> (coalesce(d.billable_congestion_surcharge_revenue, 0) is null) or abs(coalesce(s.billable_congestion_surcharge_revenue, 0) - coalesce(d.billable_congestion_surcharge_revenue, 0)) > 0.01)
+
+union all
+
+select 'trips.LTS7_daily_zone_revenue.billable_congestion_surcharge_trip_count at ' || coalesce(cast(coalesce(s.trips_to_date__day, d.trips_to_date__day) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_pickup_zone__zone, d.trips_to_pickup_zone__zone) as varchar), '') as binding,
+    cast(s.billable_congestion_surcharge_trip_count as varchar) as source_value,
+    cast(d.billable_congestion_surcharge_trip_count as varchar) as detail_value
+from s6_source as s full join s6_detail as d on s.trips_to_date__day is not distinct from d.trips_to_date__day and s.trips_to_pickup_zone__zone is not distinct from d.trips_to_pickup_zone__zone
+where coalesce(s.billable_congestion_surcharge_trip_count, 0) is distinct from coalesce(d.billable_congestion_surcharge_trip_count, 0)
+
+union all
+
+select 'trips.LTS7_daily_zone_revenue.billable_airport_fee_revenue at ' || coalesce(cast(coalesce(s.trips_to_date__day, d.trips_to_date__day) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_pickup_zone__zone, d.trips_to_pickup_zone__zone) as varchar), '') as binding,
+    cast(s.billable_airport_fee_revenue as varchar) as source_value,
+    cast(d.billable_airport_fee_revenue as varchar) as detail_value
+from s6_source as s full join s6_detail as d on s.trips_to_date__day is not distinct from d.trips_to_date__day and s.trips_to_pickup_zone__zone is not distinct from d.trips_to_pickup_zone__zone
+where ((coalesce(s.billable_airport_fee_revenue, 0) is null) <> (coalesce(d.billable_airport_fee_revenue, 0) is null) or abs(coalesce(s.billable_airport_fee_revenue, 0) - coalesce(d.billable_airport_fee_revenue, 0)) > 0.01)
+
+union all
+
+select 'trips.LTS7_daily_zone_revenue.billable_airport_fee_trip_count at ' || coalesce(cast(coalesce(s.trips_to_date__day, d.trips_to_date__day) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_pickup_zone__zone, d.trips_to_pickup_zone__zone) as varchar), '') as binding,
+    cast(s.billable_airport_fee_trip_count as varchar) as source_value,
+    cast(d.billable_airport_fee_trip_count as varchar) as detail_value
+from s6_source as s full join s6_detail as d on s.trips_to_date__day is not distinct from d.trips_to_date__day and s.trips_to_pickup_zone__zone is not distinct from d.trips_to_pickup_zone__zone
+where coalesce(s.billable_airport_fee_trip_count, 0) is distinct from coalesce(d.billable_airport_fee_trip_count, 0)
+
+union all
+
 select 'trips.LTS8_monthly_service_summary.billable_trip_count at ' || coalesce(cast(coalesce(s.trips_to_date__month, d.trips_to_date__month) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_service_type__row, d.trips_to_service_type__row) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_payment_method__payment_method, d.trips_to_payment_method__payment_method) as varchar), '') as binding,
     cast(s.billable_trip_count as varchar) as source_value,
     cast(d.billable_trip_count as varchar) as detail_value
@@ -484,6 +526,14 @@ select 'trips.LTS8_monthly_service_summary.billable_revenue at ' || coalesce(cas
     cast(d.billable_revenue as varchar) as detail_value
 from s7_source as s full join s7_detail as d on s.trips_to_date__month is not distinct from d.trips_to_date__month and s.trips_to_service_type__row is not distinct from d.trips_to_service_type__row and s.trips_to_payment_method__payment_method is not distinct from d.trips_to_payment_method__payment_method
 where ((coalesce(s.billable_revenue, 0) is null) <> (coalesce(d.billable_revenue, 0) is null) or abs(coalesce(s.billable_revenue, 0) - coalesce(d.billable_revenue, 0)) > 0.01)
+
+union all
+
+select 'trips.LTS8_monthly_service_summary.billable_measurable_tip_trip_count at ' || coalesce(cast(coalesce(s.trips_to_date__month, d.trips_to_date__month) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_service_type__row, d.trips_to_service_type__row) as varchar), '') || '|' || coalesce(cast(coalesce(s.trips_to_payment_method__payment_method, d.trips_to_payment_method__payment_method) as varchar), '') as binding,
+    cast(s.billable_measurable_tip_trip_count as varchar) as source_value,
+    cast(d.billable_measurable_tip_trip_count as varchar) as detail_value
+from s7_source as s full join s7_detail as d on s.trips_to_date__month is not distinct from d.trips_to_date__month and s.trips_to_service_type__row is not distinct from d.trips_to_service_type__row and s.trips_to_payment_method__payment_method is not distinct from d.trips_to_payment_method__payment_method
+where coalesce(s.billable_measurable_tip_trip_count, 0) is distinct from coalesce(d.billable_measurable_tip_trip_count, 0)
 
 union all
 
