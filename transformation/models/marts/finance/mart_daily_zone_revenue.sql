@@ -1,22 +1,20 @@
 -- Daily revenue by pickup zone.
 --
 -- The billable rule (ADR 0003) is applied here, in gold, and nowhere upstream,
--- so data-quality work can still see the rows this excludes.
+-- so data-quality work can still see the rows this excludes. The zone-day
+-- roll-up itself is agg_trip_zone_daily_base, shared with agg_trip_zone_daily;
+-- a zone-day with no billable trip has no row here.
 select
-    f.pickup_date as trip_date,
-    z.zone_natural_key as pickup_location_id,
-    z.borough_name as borough,
-    z.zone_name,
-    z.reporting_region,
-    count(*) as trip_count,
-    sum(f.fare_amount) as fare_revenue,
-    sum(f.tip_amount) as tip_revenue,
-    sum(f.total_surcharges) as surcharge_revenue,
-    sum(f.tolls_amount) as toll_revenue,
-    sum(f.total_amount) as total_revenue
-from {{ ref('fct_trip') }} f
-join {{ ref('dim_zone') }} z on f.pickup_zone_key = z.zone_key
-where
-    {{ in_report_window('f.pickup_datetime') }}
-    and f.is_billable
-group by 1, 2, 3, 4, 5
+    pickup_date as trip_date,
+    pickup_location_id,
+    borough_name as borough,
+    zone_name,
+    reporting_region,
+    billable_trip_count as trip_count,
+    billable_fare_revenue as fare_revenue,
+    billable_tip_revenue as tip_revenue,
+    billable_surcharge_revenue as surcharge_revenue,
+    billable_toll_revenue as toll_revenue,
+    billable_total_revenue as total_revenue
+from {{ ref('agg_trip_zone_daily_base') }}
+where billable_trip_count > 0

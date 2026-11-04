@@ -1,6 +1,28 @@
 version: 2
 
 unit_tests:
+  # --- agg_trip_zone_daily_base: billable sums beside all-trip ones -------------
+  - name: trip_zone_daily_base_keeps_both_populations
+    description: >
+      One zone-day row carries every trip and, beside it, the billable trips only; the
+      distinct driver count is over all of the zone-day's trips, so a driver whose only
+      billable trip is one of several still counts once.
+    model: agg_trip_zone_daily_base
+    overrides:
+      vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
+    given:
+      - input: ref('fct_trip')
+        rows:
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 08:00:00', driver_key: 101, is_billable: true, fare_amount: 10.0, tip_amount: 2.0, total_surcharges: 1.0, tolls_amount: 0.0, total_amount: 13.0, trip_distance: 1.0}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 09:00:00', driver_key: 101, is_billable: false, fare_amount: 0.0, tip_amount: 0.0, total_surcharges: 0.0, tolls_amount: 0.0, total_amount: 0.0, trip_distance: 0.5}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 10:00:00', driver_key: 102, is_billable: true, fare_amount: 20.0, tip_amount: 0.0, total_surcharges: 1.0, tolls_amount: 5.0, total_amount: 26.0, trip_distance: 4.0}
+      - input: ref('dim_zone')
+        rows:
+          - {zone_key: z1, zone_natural_key: 1, zone_name: A, borough_name: Queens, reporting_region: Outer}
+    expect:
+      rows:
+        - {pickup_location_id: 1, trip_count: 3, billable_trip_count: 2, attributed_driver_count: 2, total_revenue: 39.0, billable_total_revenue: 39.0, billable_fare_revenue: 30.0, billable_toll_revenue: 5.0}
+
   # --- agg_trip_zone_daily: revenue rank at the cent --------------------------
   - name: trip_zone_daily_ranks_revenue_at_the_cent
     description: >
@@ -10,17 +32,11 @@ unit_tests:
     overrides:
       vars: {report_start: '2024-01-01', report_end: '2024-04-01'}
     given:
-      - input: ref('fct_trip')
+      - input: ref('agg_trip_zone_daily_base')
         rows:
-          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 08:00:00', total_amount: 60.003}
-          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z1, pickup_datetime: '2024-01-10 09:00:00', total_amount: 40.001}
-          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z2, pickup_datetime: '2024-01-10 10:00:00', total_amount: 100.001}
-          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_zone_key: z3, pickup_datetime: '2024-01-10 11:00:00', total_amount: 60.0}
-      - input: ref('dim_zone')
-        rows:
-          - {zone_key: z1, zone_natural_key: 1, zone_name: A, borough_name: Queens}
-          - {zone_key: z2, zone_natural_key: 2, zone_name: B, borough_name: Queens}
-          - {zone_key: z3, zone_natural_key: 3, zone_name: C, borough_name: Queens}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_location_id: 1, zone_name: A, borough_name: Queens, trip_count: 2, total_revenue: 100.004}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_location_id: 2, zone_name: B, borough_name: Queens, trip_count: 1, total_revenue: 100.001}
+          - {pickup_date_key: 20240110, pickup_date: '2024-01-10', pickup_location_id: 3, zone_name: C, borough_name: Queens, trip_count: 1, total_revenue: 60.0}
     expect:
       rows:
         - {pickup_location_id: 1, revenue_rank_that_day: 1}

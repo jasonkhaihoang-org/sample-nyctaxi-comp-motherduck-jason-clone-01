@@ -3,20 +3,18 @@
 -- daily count answers "how many", and the lag and rolling average answer "is
 -- that normal", which is the question anyone actually asks next.
 with daily as (
+    -- The roll-up lives in agg_trip_zone_daily_base, shared with mart_daily_zone_revenue.
     select
-        f.pickup_date_key,
-        f.pickup_date,
-        z.zone_natural_key as pickup_location_id,
-        z.zone_name,
-        z.borough_name,
-        count(*) as trip_count,
-        sum(f.total_amount) as total_revenue,
-        sum(f.trip_distance) as total_miles,
-        count(distinct f.driver_key) as attributed_driver_count
-    from {{ ref('fct_trip') }} f
-    join {{ ref('dim_zone') }} z on f.pickup_zone_key = z.zone_key
-    where {{ in_report_window('f.pickup_datetime') }}
-    group by 1, 2, 3, 4, 5
+        pickup_date_key,
+        pickup_date,
+        pickup_location_id,
+        zone_name,
+        borough_name,
+        trip_count,
+        total_revenue,
+        total_miles,
+        attributed_driver_count
+    from {{ ref('agg_trip_zone_daily_base') }}
 )
 
 select

@@ -49,6 +49,32 @@ models:
         tests:
           - relationships: {arguments: {to: ref('dim_date'), field: date_key}}
 
+  - name: agg_trip_zone_daily_base
+    description: >
+      The zone-day roll-up of the trip fact over the reporting window, computed once
+      for agg_trip_zone_daily (every trip) and mart_daily_zone_revenue (billable trips,
+      ADR 0003). The billable sums sit beside the all-trip ones, not in a row per
+      billable flag, because attributed_driver_count is a distinct count. Read through
+      those two models; it publishes nothing of its own.
+    columns:
+      - name: pickup_date
+        tests: [not_null]
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - relationships: {arguments: {to: ref('dim_zone'), field: zone_natural_key}}
+      - name: pickup_date_key
+        tests:
+          - relationships: {arguments: {to: ref('dim_date'), field: date_key}}
+      - name: trip_count
+        description: Every trip in the window, billable or not.
+        tests: [not_null]
+      - name: billable_trip_count
+        description: Trips the billable rule keeps (ADR 0003); 0 where none.
+        tests: [not_null]
+      - name: attributed_driver_count
+        description: Distinct drivers across all of the zone-day's trips.
+
   - name: agg_od_flow_matrix
     description: >
       Origin-to-destination flow -- the same zone dimension joined twice, in both
