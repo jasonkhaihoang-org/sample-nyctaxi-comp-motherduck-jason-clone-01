@@ -152,6 +152,14 @@
               "custom"
             ]
           },
+          "role": {
+            "enum": [
+              "input",
+              "internal",
+              "boundary"
+            ],
+            "description": "What the layer is for, which decides the rules that apply to it, never its name: `input` is landed by a loader and read by nothing in the repo, `internal` is built for the Domain's own use, `boundary` is read by a consumer outside the repo. `input` and `boundary` layers owe a data contract (ADR-0225); a `boundary` relation is a candidate for the semantic layer. When absent it is derived (`built_by: dlt` is `input`, any other is `internal`), so a Domain declares it on every layer."
+          },
           "path": {
             "type": [
               "string",
