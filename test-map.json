@@ -259,16 +259,6 @@
         "all": true
       },
       {
-        "role": "ingestion_root",
-        "paths": [
-          "requirements.txt"
-        ],
-        "checks": [
-          "dlt-gate"
-        ],
-        "all": true
-      },
-      {
         "role": "orchestration",
         "checks": [
           "orchestration-static"
@@ -304,6 +294,7 @@
           "repo-map.schema.json",
           "test-map.schema.json",
           ".pre-commit-config.yaml",
+          "requirements.txt",
           "requirements-dev.txt",
           "*.md",
           ".gitignore",

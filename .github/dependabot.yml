@@ -1,0 +1,26 @@
+# Vibedata Domain CI Dependabot configuration (written by onboarding to .github/dependabot.yml when the repo has
+# none). One `vibedata` group moves the callers' workflow pins and the root requirements.txt package pins in
+# one PR per release (D7). Keep both Vibedata entries in that one group and do not add other entries to it
+# (customer responsibility, AC-74). Cooldown 0 lets a release arrive on the next daily run; the CI owner's merge
+# is still the gate (D17). This file is customer-owned once written: raise the cooldown or add entries as you need.
+version: 2
+multi-ecosystem-groups:
+  vibedata:
+    schedule:
+      interval: daily
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    multi-ecosystem-group: vibedata
+    patterns: ["accelerate-data/vibedata-official*"]
+    cooldown:
+      default-days: 0
+  - package-ecosystem: pip
+    directory: "/"
+    multi-ecosystem-group: vibedata
+    patterns: ["vibedata-domain-*"]
+    allow:
+      - dependency-name: "vibedata-domain-*"
+    cooldown:
+      default-days: 0
+# VD-7828 AC-8 spike (part 2 template, PR #804): 2026-11-13

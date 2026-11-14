@@ -1,0 +1,31 @@
+# Every dependency this Domain installs, in one file: CI and the agent both run
+# `uv pip install -r requirements.txt`. The vibedata-domain-* lines are moved only by
+# Dependabot; every other line by the process that writes this file.
+
+# Ingestion
+dlt==1.30.0
+duckdb==1.5.6
+pyarrow==25.0.1
+requests==2.34.2
+vibedata-dlt-duckdb-studio==0.11.0
+
+# Transformation
+dbt-core==1.12.5
+dbt-duckdb==1.11.0
+sqlfluff==4.4.0
+sqlfluff-templater-dbt==4.4.0
+
+# Logical model
+vibedata-odcs==0.2.3
+vibedata-ossie==0.1.1
+
+# CI tools (the checks CI runs)
+pip-audit==2.10.1
+pre-commit==4.7.0
+pytest==9.2.0
+pyyaml==6.0.3
+ruff==0.17.5
+
+# Vibedata CI (Dependabot)
+vibedata-domain-ci==1.0.0rc18
+vibedata-domain-hooks==1.0.0rc18

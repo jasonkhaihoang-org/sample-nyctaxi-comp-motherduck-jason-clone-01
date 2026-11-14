@@ -1,0 +1,43 @@
+# Vibedata CI workspace cleanup caller (written by onboarding; identical on every platform). Removes a closed
+# PR's CI environment, and nightly every environment whose PR is no longer open. Edit only the pin, which the
+# release's Dependabot PR moves. Secret names come from .workflow/ci-config.yml, never from this file.
+name: CI workspace cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read   # which PRs are still open
+  id-token: write       # Fabric OIDC sign-in
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      motherduck_token: ${{ steps.read.outputs.MOTHERDUCK_TOKEN_VAR }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .workflow/ci-config.yml
+          sparse-checkout-cone-mode: false
+      # Reads each secret's name from .workflow/ci-config.yml (AC-29) with sed: no install, no Vibedata code.
+      - id: read
+        run: |
+          for key in MOTHERDUCK_TOKEN_VAR; do
+            value=$(sed -n -E "s/^${key}:[[:space:]]*[\"']?([A-Za-z0-9_]*).*/\1/p" .workflow/ci-config.yml | head -n 1)
+            echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+          done
+
+  cleanup:
+    needs: config
+    uses: accelerate-data/vibedata-official/.github/workflows/cleanup.yml@domain-ci/v1.0.0rc18
+    secrets:
+      MOTHERDUCK_TOKEN: ${{ secrets[needs.config.outputs.motherduck_token] }}
