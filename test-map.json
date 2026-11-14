@@ -259,6 +259,16 @@
         "all": true
       },
       {
+        "role": "ingestion_root",
+        "paths": [
+          "requirements.txt"
+        ],
+        "checks": [
+          "dlt-gate"
+        ],
+        "all": true
+      },
+      {
         "role": "orchestration",
         "checks": [
           "orchestration-static"
