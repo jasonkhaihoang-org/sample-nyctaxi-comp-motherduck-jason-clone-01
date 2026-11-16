@@ -38,6 +38,6 @@ jobs:
 
   cleanup:
     needs: config
-    uses: accelerate-data/vibedata-official/.github/workflows/cleanup.yml@domain-ci/v1.0.0rc25
+    uses: accelerate-data/vibedata-official/.github/workflows/cleanup.yml@domain-ci/v1.0.0rc26
     secrets:
       MOTHERDUCK_TOKEN: ${{ secrets[needs.config.outputs.motherduck_token] }}
