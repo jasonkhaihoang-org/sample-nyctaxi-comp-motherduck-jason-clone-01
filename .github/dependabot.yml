@@ -8,6 +8,8 @@ multi-ecosystem-groups:
   vibedata:
     schedule:
       interval: daily
+      time: "06:00"
+      timezone: "Asia/Ho_Chi_Minh"
 updates:
   - package-ecosystem: github-actions
     directory: "/"
