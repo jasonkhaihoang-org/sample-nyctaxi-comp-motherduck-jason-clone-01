@@ -10,7 +10,7 @@ the domain decision afterward.
 import subprocess
 import sys
 
-from dbt_docs_publish import build_release_publish_commands, RELEASE_TAG
+from vibedata_domain_ci.dbt_docs_publish import build_release_publish_commands, RELEASE_TAG
 
 
 def main(target_dir: str, asset_names: list[str] | None = None) -> int:

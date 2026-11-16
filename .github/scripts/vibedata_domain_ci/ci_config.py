@@ -6,16 +6,7 @@ and reusable without going through the CLI shell.
 import os
 import re
 
-from vibedata_domain_ci.platform_enum import (
-    DATABRICKS,
-    DUCKDB_LOCAL,
-    FABRIC_LAKEHOUSE,
-    FABRIC_WAREHOUSE,
-    MOTHERDUCK,
-    PLATFORMS,
-    SNOWFLAKE,
-    VALID_PLATFORMS,
-)
+from vibedata_domain_ci.platform_enum import FABRIC_LAKEHOUSE, PLATFORMS, VALID_PLATFORMS
 
 try:
     import yaml
@@ -34,74 +25,51 @@ def locate_project_dir(root: str = ".") -> str:
     return "transformation" if os.path.isfile(candidate) else "."
 
 INTENT_SLUG_RE = re.compile(r"^intent/[a-z0-9][a-z0-9\-]+$")
+DEPENDABOT_BRANCH_RE = re.compile(r"^dependabot/.+")  # a version bump has no intent
+REVERT_PREFIX_RE = re.compile(r"^revert-\d+-")  # GitHub's Revert button: `revert-<PR number>-<branch>`
 
-# The two `*_NAME` coordinates are deliberately absent: no workflow consumes them
-# (ci.yml re-exports them as preflight outputs that nothing reads downstream), and
-# both the /install-ci skill and the plugin's runtime-location-contract.json declare
-# them optional. Requiring them here failed an install that legitimately omitted them.
-_FABRIC_REQUIRED_KEYS = [
-    "VD_DOMAIN_SLUG",
-    "VD_DOMAIN_FABRIC_LAKEHOUSE_WORKSPACE_ID",
-    "VD_DOMAIN_FABRIC_LAKEHOUSE_ID",
-]
 
-# A Warehouse's coordinates are warehouse-shaped, not lakehouse-shaped, and the NAME
-# is load-bearing rather than cosmetic: the Intent's bridge Lakehouse — and the CI
-# bridge that mirrors it — must carry the Domain Warehouse's name verbatim, because a
-# three-part TDS name records no workspace and only resolves against an item of
-# exactly that name.
-_FABRIC_WAREHOUSE_REQUIRED_KEYS = [
-    "VD_DOMAIN_SLUG",
-    "VD_DOMAIN_FABRIC_WAREHOUSE_WORKSPACE_ID",
-    "VD_DOMAIN_FABRIC_WAREHOUSE_WORKSPACE_NAME",
-    "VD_DOMAIN_FABRIC_WAREHOUSE_ID",
-    "VD_DOMAIN_FABRIC_WAREHOUSE_NAME",
-]
+def load_config_keys() -> dict:
+    """The released configuration-key list, `data/config-keys.yml`: `required_keys` per platform,
+    `keys` (dotted path -> {alias?}), `var_keys` and `retired_keys`. The only source of these lists."""
+    with open(os.path.join(os.path.dirname(__file__), "data", "config-keys.yml"), encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
-_MOTHERDUCK_REQUIRED_KEYS = [
-    "VD_DOMAIN_SLUG",
-    "VD_DOMAIN_MOTHERDUCK_DATABASE",
-]
 
-# LocalDuck runs no CI against a target platform, so it has no credential/coordinate
-# keys to validate — just the domain slug every platform's config carries.
-_DUCKDB_LOCAL_REQUIRED_KEYS = [
-    "VD_DOMAIN_SLUG",
-]
+_CONFIG_KEYS = load_config_keys()
+_REQUIRED_KEYS_BY_PLATFORM = _CONFIG_KEYS["required_keys"]
+_KNOWN_KEYS = set(_CONFIG_KEYS["keys"]) | set(_CONFIG_KEYS["var_keys"])
+_KEY_ALIASES = {k: v["alias"] for k, v in _CONFIG_KEYS["keys"].items() if (v or {}).get("alias")}
 
-# Total over platform_enum.VALID_PLATFORMS — every member has its own entry, so a
-# future platform added to VALID_PLATFORMS without a matching entry here raises
-# (via the dict indexing below) instead of silently inheriting Fabric's keys.
-# Snowflake and Databricks publish only the production manifest, whose offline compile
-# renders the database or catalog into every relation name. The Primary Schema is optional,
-# as the Domain binding's is: an absent one falls back to the platform's default schema in
-# the publish profile.
-_SNOWFLAKE_REQUIRED_KEYS = [
-    "VD_DOMAIN_SLUG",
-    "VD_DOMAIN_SNOWFLAKE_DATABASE",
-]
 
-_DATABRICKS_REQUIRED_KEYS = [
-    "VD_DOMAIN_SLUG",
-    "VD_DOMAIN_DATABRICKS_CATALOG",
-]
+def validate_config(config: dict, known_keys, retired_keys: dict) -> list[dict]:
+    """Findings for every key in `config`, walking nested mappings as dotted paths.
 
-_REQUIRED_KEYS_BY_PLATFORM = {
-    FABRIC_LAKEHOUSE: _FABRIC_REQUIRED_KEYS,
-    FABRIC_WAREHOUSE: _FABRIC_WAREHOUSE_REQUIRED_KEYS,
-    MOTHERDUCK: _MOTHERDUCK_REQUIRED_KEYS,
-    DUCKDB_LOCAL: _DUCKDB_LOCAL_REQUIRED_KEYS,
-    SNOWFLAKE: _SNOWFLAKE_REQUIRED_KEYS,
-    DATABRICKS: _DATABRICKS_REQUIRED_KEYS,
-}
+    A retired key is an error naming it and, for a rename, its replacement. A key neither known nor
+    retired is a warning only. A mapping is walked only under a known key that has known or retired
+    children, so a free-form value is never mistaken for keys.
+    Returns `[{"severity": "error" | "warning", "message": str}]`.
+    """
+    nested = {k.rsplit(".", 1)[0] for k in [*known_keys, *retired_keys] if "." in k}
+    findings = []
 
-# The indirection block is validated permissively on purpose: an
-# unrecognised key passes through so an older repository does not break on a
-# stale one. No `*_VAR` key is required here — a mapping can
-# be present and correct while the Variable it names is unset, so requiring the
-# key would not catch the real failure anyway. Validating that a named Variable
-# actually resolves needs the workflow to pass `${{ vars[...] }}` in, which is a
-# separate change across the bundles.
+    def walk(mapping, prefix):
+        for key, value in mapping.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            retired = retired_keys.get(path)
+            if retired is not None:
+                since = f" in {retired['since']}" if retired.get("since") else ""
+                message = (f"`{path}` was renamed to `{retired['replaced_by']}`{since}"
+                           if retired.get("replaced_by") else f"`{path}` was removed{since}")
+                findings.append({"severity": "error", "message": message})
+            elif path in known_keys:
+                if isinstance(value, dict) and path in nested:
+                    walk(value, path)
+            else:
+                findings.append({"severity": "warning", "message": f"unknown key `{path}`"})
+
+    walk(config, "")
+    return findings
 
 
 def _is_blank(value) -> bool:
@@ -136,37 +104,9 @@ def require_indirection_key(config: dict, key: str) -> dict:
     """
     value = config.get(key)
     if not isinstance(value, str) or _is_blank(value):
-        return {"ok": False, "value": None, "error": f"ci-config.yml must set {key} to a GitHub Actions secret or variable name"}
+        return {"ok": False, "value": None, "error": f".workflow/ci-config.yml must set {key} to a GitHub Actions secret or variable name"}
     return {"ok": True, "value": value.strip(), "error": None}
 
-
-# Committed coordinate key -> legacy lowercase key every existing downstream
-# consumer (preflight.py's GITHUB_OUTPUT writer, ci.yml's `outputs.*` refs,
-# fabric_api.py) already expects. VD_DOMAIN_SCHEMA has no entry here —
-# confirmed dead, dropped rather than renamed.
-_KEY_ALIASES = {
-    "VD_DOMAIN_DATA_PLATFORM": "platform",
-    "VD_DOMAIN_SLUG": "domain",
-    "VD_DOMAIN_FABRIC_LAKEHOUSE_WORKSPACE_ID": "prod_workspace_id",
-    "VD_DOMAIN_FABRIC_LAKEHOUSE_WORKSPACE_NAME": "prod_workspace_name",
-    "VD_DOMAIN_FABRIC_LAKEHOUSE_ID": "prod_lakehouse_id",
-    "VD_DOMAIN_FABRIC_LAKEHOUSE_NAME": "prod_lakehouse_name",
-    # No Warehouse entries, on purpose. The Warehouse preflight job reads its
-    # coordinates back under their own VD_DOMAIN_FABRIC_WAREHOUSE_* names (an
-    # untranslated key passes through to GITHUB_OUTPUT unchanged), and its publish
-    # workflow reads ci-config.yml directly, so no consumer needs a legacy name.
-    # A shared alias would also make `_translate_config_keys` lossy for a malformed
-    # config carrying both Fabric kinds' coordinates — two source keys mapping to
-    # one `prod_workspace_id` silently drops whichever comes first.
-    "VD_DOMAIN_MOTHERDUCK_DATABASE": "prod_db_name",
-    "VD_DOMAIN_SNOWFLAKE_DATABASE": "prod_db_name",
-    "VD_DOMAIN_DATABRICKS_CATALOG": "prod_db_name",
-    "VD_DOMAIN_SNOWFLAKE_PRIMARY_SCHEMA": "prod_schema_name",
-    "VD_DOMAIN_DATABRICKS_PRIMARY_SCHEMA": "prod_schema_name",
-    "VD_DOMAIN_CI_DBT_PROFILE": "ci_target",
-    "VD_DOMAIN_CI_SPARK_COMPUTE": "spark_compute",
-    "VD_DOMAIN_PROD_MANIFEST_SOURCE": "prod_manifest_source",
-}
 
 # duckdb-quack is handled below with a specific migration message before this check.
 # The accepted values are owned by platform_enum so every consumer that branches
@@ -182,8 +122,9 @@ def _translate_config_keys(config: dict) -> dict:
 
 
 def validate_intent_slug(branch_name: str) -> tuple[bool, str | None]:
-    """Return (valid, branch_name_if_valid_else_None)."""
-    if INTENT_SLUG_RE.match(branch_name):
+    """Return (valid, branch_name_if_valid_else_None). A GitHub revert of an accepted branch is accepted."""
+    reverted = REVERT_PREFIX_RE.sub("", branch_name, count=1)
+    if INTENT_SLUG_RE.match(reverted) or DEPENDABOT_BRANCH_RE.match(reverted):
         return True, branch_name
     return False, None
 
@@ -198,7 +139,9 @@ def parse_ci_config(yaml_str: str) -> dict:
             "error": str | None,
             "line_number": int | None,
             "missing_keys": list[str],
+            "warnings": list[str],   # unknown keys; present once the keys are validated
         }
+    A retired key fails, naming it and any replacement.
     """
     if yaml is None:
         return {"ok": False, "config": {}, "error": "pyyaml not installed", "line_number": None, "missing_keys": []}
@@ -247,14 +190,17 @@ def parse_ci_config(yaml_str: str) -> dict:
     # exception that still defaults to Fabric's keys, matching prior behavior.
     # Any non-None, recognized-but-unmapped platform raises KeyError rather than
     # silently inheriting Fabric's required keys.
-    required_keys = _FABRIC_REQUIRED_KEYS if platform is None else _REQUIRED_KEYS_BY_PLATFORM[platform]
+    required_keys = _REQUIRED_KEYS_BY_PLATFORM[FABRIC_LAKEHOUSE if platform is None else platform]
     absent = [k for k in required_keys if k not in config]
     blank = [k for k in required_keys if k in config and _is_blank(config[k])]
     # Every key, not only required ones: an optional line left as `<string>`
     # is just as wrong as a required one.
     placeholder = [k for k, v in config.items() if _is_placeholder(v)]
+    findings = validate_config(config, _KNOWN_KEYS, _CONFIG_KEYS["retired_keys"])
+    retired = [f["message"] for f in findings if f["severity"] == "error"]
+    warnings = [f["message"] for f in findings if f["severity"] == "warning"]
 
-    if absent or blank or placeholder:
+    if absent or blank or placeholder or retired:
         parts = []
         if absent:
             parts.append(f"Missing required keys: {absent}")
@@ -262,15 +208,19 @@ def parse_ci_config(yaml_str: str) -> dict:
             parts.append(f"Required keys present but empty: {blank}")
         if placeholder:
             parts.append(f"Template placeholders left unfilled: {placeholder}")
+        if retired:
+            parts.append(f"Retired keys: {'; '.join(retired)}")
         return {
             "ok": False,
             "config": _translate_config_keys(config),
             "error": ". ".join(parts),
             "line_number": None,
             "missing_keys": absent + blank + placeholder,
+            "warnings": warnings,
         }
 
-    return {"ok": True, "config": _translate_config_keys(config), "error": None, "line_number": None, "missing_keys": []}
+    return {"ok": True, "config": _translate_config_keys(config), "error": None, "line_number": None, "missing_keys": [],
+            "warnings": warnings}
 
 
 def resolve_prod_manifest_mode(yaml_str: str) -> str:

@@ -22,7 +22,7 @@ import argparse
 import json
 import sys
 
-from ci_config import locate_ci_config, parse_ci_config
+from vibedata_domain_ci.ci_config import locate_ci_config, parse_ci_config
 
 
 def _render_human(path: str, result: dict) -> str:

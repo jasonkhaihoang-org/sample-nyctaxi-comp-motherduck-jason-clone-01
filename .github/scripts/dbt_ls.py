@@ -14,10 +14,8 @@ import os
 import subprocess
 import sys
 
-try:
-    from scripts import runner_io
-except ImportError:
-    import runner_io
+from vibedata_domain_ci import runner_io
+
 
 def _make_dbt_ls_cmd(selector: str) -> list[str]:
     """Build the dbt ls command, honouring DBT_COMPILE_PROFILE / DBT_COMPILE_TARGET env vars.

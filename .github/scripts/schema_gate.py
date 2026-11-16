@@ -15,7 +15,7 @@ import os
 import subprocess
 import sys
 
-from dbt_manifest import Manifest
+from vibedata_domain_ci.dbt_manifest import Manifest
 
 
 def get_pr_changed_files(repo: str, base_sha: str, head_sha: str) -> set[str]:

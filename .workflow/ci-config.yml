@@ -1,13 +1,43 @@
-# Domain CI Configuration — MotherDuck
+# Domain CI Configuration — MotherDuck platform
+#
+# Installed once by the `/install-ci` skill, which copies this template and
+# substitutes this Domain's coordinates. The file then belongs to the
+# repository: nothing rewrites it, and your edits persist.
+
+# Platform discriminator. Must be exactly "motherduck" for this bundle.
 VD_DOMAIN_DATA_PLATFORM: motherduck
-VD_DOMAIN_SLUG: nyc-taxi-motherduck-demo
-VD_DOMAIN_SCHEMA: main
-VD_DOMAIN_MOTHERDUCK_DATABASE: sa_prd
 
-VD_DOMAIN_PROD_MANIFEST_SOURCE:
-  mode: artifact
+# Short slug identifying this domain (kebab-case).
+VD_DOMAIN_SLUG: motherduck-01
 
+# Production MotherDuck database name. Gates 0-1 render this into the manifest
+# via dbt_motherduck_compile (database: prd), so it must match the live prod database.
+VD_DOMAIN_MOTHERDUCK_DATABASE: prd
+
+# GHA Variable/Secret name indirection. Values here are the *names*
+# Studio provisions as repo Variables/Secrets, not domain data.
 MOTHERDUCK_TOKEN_VAR: VD_CI_MOTHERDUCK_TOKEN
 LLM_API_KEY_VAR: VD_CI_LLM_API_KEY
 LLM_API_URL_VAR: VD_CI_LLM_API_URL
 LLM_MODEL_VAR: VD_CI_LLM_MODEL
+
+# MotherDuck service token: set the GitHub Actions secret named by MOTHERDUCK_TOKEN_VAR above
+# (VD_CI_MOTHERDUCK_TOKEN) (Settings -> Secrets and variables -> Actions -> Secrets) -- not in this file.
+
+# Prod-state manifest artifact -- published by publish-prod-manifest-motherduck.yml on push to main.
+VD_DOMAIN_PROD_MANIFEST_SOURCE:
+  mode: artifact
+  workflow: publish-prod-manifest-motherduck.yml
+  artifact_name: prod-manifest-motherduck
+
+# Optional: where the Logical model job finds the canonical logical model, ontology and data
+# contracts and what it checks them against. Leave the block out to use the defaults shown; a
+# missing model, ontology or contracts directory skips its checks with a notice.
+# logical_model:
+#   model_dir: logical-model                 # the *.ossie.yaml documents
+#   models_dir: transformation/models        # default: <dbt project>/models (searched recursively)
+#   tests_dir: transformation/tests          # default: <dbt project>/tests (generated dbt tests)
+#   adr_dir: docs/adr
+#   ontology_dir: ontology                   # the ontology and its mapping documents
+#   context_file: CONTEXT.md                 # the glossary the ontology's concepts must match
+#   contracts_dir: contracts                 # the {schema}/{table}.odcs.yaml data contracts
