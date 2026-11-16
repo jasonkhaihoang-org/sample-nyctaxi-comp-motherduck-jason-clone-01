@@ -1,0 +1,28 @@
+# Vibedata publish caller (written by onboarding; identical on every platform): on a push to main, publish the
+# production manifest, then the dbt Docs site. Edit only the pins, which the release's Dependabot PR moves.
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# dbt-docs-latest is repo-wide: overlapping runs queue instead of clobbering it mid-upload.
+concurrency:
+  group: vibedata-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # GitHub Releases: dbt-manifest-<sha> and dbt-docs-latest
+  id-token: write   # Fabric OIDC sign-in
+
+jobs:
+  publish-manifest:
+    # dbt-docs-latest is production state: a manual run from another branch is refused here.
+    if: github.ref == 'refs/heads/main'
+    uses: accelerate-data/vibedata-official/.github/workflows/publish-manifest.yml@domain-ci/v1.0.0rc25
+
+  publish-docs:
+    needs: publish-manifest
+    if: github.ref == 'refs/heads/main'
+    uses: accelerate-data/vibedata-official/.github/workflows/publish-docs.yml@domain-ci/v1.0.0rc25
