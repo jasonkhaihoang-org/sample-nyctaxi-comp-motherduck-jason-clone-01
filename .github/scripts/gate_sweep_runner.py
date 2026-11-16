@@ -23,8 +23,7 @@ import json
 import os
 import sys
 
-import emit_status
-
+from vibedata_domain_ci import emit_status
 from gate_sweep import plan_gate_sweep
 
 

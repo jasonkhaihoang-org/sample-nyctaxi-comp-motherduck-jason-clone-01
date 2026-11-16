@@ -8,8 +8,8 @@ from typing import Iterable
 
 _PR_SUFFIX_RE = re.compile(r"^(\d+)_[0-9a-f]+$")
 
-# The CI engine's `provision` names one database per PR with this fixed suffix and reuses it on every
-# push, so the push cleanup must never treat it as a stale per-SHA database.
+# The CI engine's `provision` names one database per PR with this fixed suffix and re-clones it on every
+# run, so the push cleanup must never treat it as a stale per-SHA database.
 ENGINE_STABLE_SUFFIX = "0000000"
 
 
@@ -27,7 +27,7 @@ def derive_ci_database_name(domain_slug: str, pr_number: int, head_sha_short: st
     return f"pr_{_domain_safe(domain_slug)}_{pr_number}_{head_sha_short}"
 
 
-def _parse_pr_number(name: str, domain_slug: str) -> int | None:
+def parse_pr_number(name: str, domain_slug: str) -> int | None:
     """Return `name`'s PR number if it is this Domain's own well-formed per-PR
     database name, else None.
 
@@ -58,9 +58,9 @@ def clear_db_retention_sql(db_name: str) -> str:
     return f"ALTER DATABASE {db_name} SET SNAPSHOT_RETENTION_DAYS = 0;"
 
 
-def drop_database_sql(name: str) -> str:
-    """Render DROP DATABASE <name>."""
-    return f"DROP DATABASE {name};"
+def drop_database_sql(name: str, if_exists: bool = False) -> str:
+    """Render DROP DATABASE [IF EXISTS] <name>."""
+    return f"DROP DATABASE {'IF EXISTS ' if if_exists else ''}{name};"
 
 
 def filter_pr_databases(all_db_names: Iterable[str], domain_slug: str) -> list[str]:
@@ -72,7 +72,7 @@ def filter_pr_databases(all_db_names: Iterable[str], domain_slug: str) -> list[s
     number is ever parsed, so a same-numbered PR on another Domain can never
     be matched.
     """
-    return [n for n in all_db_names if _parse_pr_number(n, domain_slug) is not None]
+    return [n for n in all_db_names if parse_pr_number(n, domain_slug) is not None]
 
 
 def stale_pr_databases(
@@ -89,7 +89,7 @@ def stale_pr_databases(
     """
     result: list[str] = []
     for name in pr_databases:
-        parsed = _parse_pr_number(name, domain_slug)
+        parsed = parse_pr_number(name, domain_slug)
         if parsed is None:
             continue
         if name.endswith(f"_{ENGINE_STABLE_SUFFIX}"):
@@ -115,7 +115,7 @@ def databases_to_drop(
     open_set = {int(n) for n in open_pr_numbers}
     result: list[str] = []
     for name in pr_databases:
-        pr_num = _parse_pr_number(name, domain_slug)
+        pr_num = parse_pr_number(name, domain_slug)
         if pr_num is None:
             continue
         if closed_pr_number is not None:

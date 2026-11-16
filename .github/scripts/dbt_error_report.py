@@ -13,9 +13,8 @@ import re
 import subprocess
 import sys
 
-import parse_run_results as prr
-import runner_io
-
+from vibedata_domain_ci import parse_run_results as prr
+from vibedata_domain_ci import runner_io
 # Matches: "Compilation Error in model my_model (path/to/model.sql)"
 # Also handles dbt log-prefixed lines like "16:04:22  Compilation Error in model …"
 _COMPILE_ERROR_RE = re.compile(r"Compilation Error in model (\S+)")
@@ -36,7 +35,7 @@ _ERROR_HEADER_RE = re.compile(r"(?:Parsing|Compilation|Database|Runtime) Error")
 # prints — a package URL it failed to clone, a profile it failed to open. A
 # commit-status description is readable by anyone with repo read, so these are
 # replaced while the rest of the message survives: a redacted message the reader
-# can still act on beats a generic one they cannot (ADR-0085's human-UI posture).
+# can still act on beats a generic one they cannot (the human-UI posture).
 _CREDENTIAL_PATTERNS = (
     # https://user:secret@host, and https://token@host — a token used as the
     # whole userinfo has no colon, which is the shape `dbt deps` produces for a
@@ -100,7 +99,8 @@ def summarize_parse_failure(output: str) -> str:
     """One line naming why dbt refused to parse the project, for a commit status.
 
     A gate that cannot parse the project has to say what broke it: "see job
-    logs" leaves the PR reader with a red check and no artifact to look at. Returns "" when the output carries no line dbt itself labelled
+    logs" leaves the PR reader with a red check and no artifact to look at.
+    Returns "" when the output carries no line dbt itself labelled
     as an error, so the caller keeps its own generic message rather than
     inventing a cause — or relaying an arbitrary log line, which the same log's
     `dbt deps` half can make a credential-bearing one.

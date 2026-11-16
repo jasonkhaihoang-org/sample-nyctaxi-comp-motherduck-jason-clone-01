@@ -1,10 +1,44 @@
-# LocalDuck CI uses a runner-local file shared by parse, compile, and static docs
-# generation. It is not a Domain database and is discarded with the GitHub runner.
-dbt_localduck_static:
-  target: static
+# dbt-duckdb profiles for the MotherDuck CI bundle.
+#
+# Three profiles ship:
+#   dbt_motherduck_compile — offline, renders database: <PROD_DB_NAME> (Gates 0, 1, prod-state publish)
+#   dbt_motherduck_ci      — live, MotherDuck-backed (Gates 2, 3, 4)
+#   dbt_motherduck_prd     — live, targets <PROD_DB_NAME> directly (initial seed, domain-deploy, E2E fixture init)
+#
+# PROD_DB_NAME is the Domain's own configured production database (VD_DOMAIN_MOTHERDUCK_DATABASE)
+# — every caller of these profiles must set it in the environment before invoking dbt.
+# It is never hardcoded here, so two Domains on one MotherDuck account never resolve to the same
+# database.
+#
+# CI workflows always pass --profiles-dir .github/profiles; no collision with ~/.dbt/profiles.yml.
+
+dbt_motherduck_compile:
+  target: compile
   outputs:
-    static:
+    compile:
       type: duckdb
-      path: /tmp/vibedata_localduck_ci.duckdb
-      database: vibedata_localduck_ci
+      path: ':memory:'
+      database: "{{ env_var('PROD_DB_NAME') }}"          # the Domain's configured production database
+      schema: main
+      attach:
+        - path: ':memory:'
+          alias: "{{ env_var('PROD_DB_NAME') }}"         # dbt-duckdb>=1.9.4 requires database to match an attach alias when path is :memory:
+
+dbt_motherduck_ci:
+  target: ci
+  outputs:
+    ci:
+      type: duckdb
+      # domain_safe: DOMAIN_SLUG with '-' normalised to '_', matching
+      # ci_database.py's _domain_safe exactly so this attaches to the same database
+      # Gate 2's clone step created via ci_database.derive_ci_database_name.
+      path: "md:pr_{{ env_var('DOMAIN_SLUG').replace('-', '_') }}_{{ env_var('PR_NUMBER') }}_{{ env_var('HEAD_SHA_SHORT') }}?motherduck_token={{ env_var('MOTHERDUCK_TOKEN') }}"
+      schema: main
+
+dbt_motherduck_prd:
+  target: prd
+  outputs:
+    prd:
+      type: duckdb
+      path: "md:{{ env_var('PROD_DB_NAME') }}?motherduck_token={{ env_var('MOTHERDUCK_TOKEN') }}"
       schema: main

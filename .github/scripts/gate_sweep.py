@@ -15,8 +15,8 @@ Pure: the caller supplies the job results and dispatches the emissions.
 """
 from typing import Mapping, NamedTuple
 
-from emit_status import DESCRIPTION_LIMIT
-from platform_enum import FABRIC_LAKEHOUSE, MOTHERDUCK
+from vibedata_domain_ci.emit_status import DESCRIPTION_LIMIT
+from vibedata_domain_ci.platform_enum import FABRIC_LAKEHOUSE, MOTHERDUCK
 
 
 class SweepStatus(NamedTuple):
@@ -27,7 +27,7 @@ class SweepStatus(NamedTuple):
 
 # Required context -> the ci.yml job that owns emitting it. Order is the gate
 # ladder's own order; it drives both the sweep order and the order causes are
-# named in. Keep it in step with ci.yml.
+# named in. Must stay in sync with ci.yml and configure_repo.py.
 _FABRIC_OWNERS = {
     "ci/preflight": "preflight",
     "ci/adr-numbering": "adr-numbering",

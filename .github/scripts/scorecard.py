@@ -18,7 +18,7 @@ import os
 import re
 import sys
 
-from dbt_manifest import Manifest
+from vibedata_domain_ci.dbt_manifest import Manifest
 
 
 def load_naming_rules(agents_md_path: str) -> list[str]:
@@ -31,10 +31,15 @@ def load_naming_rules(agents_md_path: str) -> list[str]:
     return patterns
 
 
+VALID_PREFIXES = ("stg_", "fct_", "dim_", "int_", "mart_", "src_", "elementary")
+# Tool infrastructure models accepted by exact name: dbt Semantic Layer's
+# documented time spine.
+VALID_NAMES = ("metricflow_time_spine",)
+
+
 def check_naming(model_name: str) -> bool:
     """Return True if model name follows known medallion patterns."""
-    valid_prefixes = ("stg_", "fct_", "dim_", "int_", "mart_", "src_", "elementary")
-    return any(model_name.startswith(p) for p in valid_prefixes)
+    return model_name in VALID_NAMES or any(model_name.startswith(p) for p in VALID_PREFIXES)
 
 
 def scorecard(manifest: dict | Manifest, agents_md_path: str) -> dict:
@@ -94,7 +99,10 @@ def scorecard(manifest: dict | Manifest, agents_md_path: str) -> dict:
             violations.append({
                 "model": name,
                 "path": n.get("original_file_path", ""),
-                "issue": f"Name '{name}' does not match expected prefix (stg_/fct_/dim_/int_)",
+                "issue": (
+                    f"Name '{name}' does not match expected prefix "
+                    f"({'/'.join(VALID_PREFIXES)}) or name ({'/'.join(VALID_NAMES)})"
+                ),
             })
 
     passed = (
