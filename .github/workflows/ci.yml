@@ -1,0 +1,1100 @@
+# MotherDuck CI — Gates 0, 1, design-drift, 2, 4 (static-check + state-modified+ + design-drift + ci/run + ci/data-tests).
+# Gate 3 (ci/unit-tests) is also wired.
+name: CI (MotherDuck)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+env:
+  # Modules the CI engine owns ship as the vibedata_domain_ci package under .github/scripts.
+  PYTHONPATH: .github/scripts
+  PYTHON_VERSION: "3.11"
+  SCRIPTS: .github/scripts
+  # Shared dbt ls / emit_deployment_manifest read these to select the compile profile.
+  DBT_COMPILE_PROFILE: dbt_motherduck_compile
+  DBT_COMPILE_TARGET: compile
+
+jobs:
+  # ─── PREFLIGHT ────────────────────────────────────────────────────────────────
+  preflight:
+    name: "ci/preflight: intent + config"
+    runs-on: ubuntu-latest
+    outputs:
+      domain: ${{ steps.preflight.outputs.domain }}
+      intent_slug: ${{ steps.preflight.outputs.intent_slug }}
+      prod_db_name: ${{ steps.preflight.outputs.prod_db_name }}
+      motherduck_token_var: ${{ steps.preflight.outputs.MOTHERDUCK_TOKEN_VAR }}
+      llm_api_key_var: ${{ steps.preflight.outputs.LLM_API_KEY_VAR }}
+      llm_api_url_var: ${{ steps.preflight.outputs.LLM_API_URL_VAR }}
+      llm_model_var: ${{ steps.preflight.outputs.LLM_MODEL_VAR }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - run: pip install pyyaml --quiet
+
+      - name: Emit ci/preflight pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/preflight" --state "pending" \
+            --description "Preflight: validating intent + config" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Check branch sync
+        id: sync
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BEHIND=$(gh api \
+            "repos/${{ github.repository }}/compare/main...${{ github.event.pull_request.head.sha }}" \
+            --jq '.behind_by' 2>/dev/null || echo "0")
+          echo "behind_by=${BEHIND}" >> "$GITHUB_OUTPUT"
+
+          CONFLICT_FILES=""
+          if [ "${BEHIND:-0}" -gt 0 ] 2>/dev/null; then
+            git fetch origin main --quiet || true
+            MERGE_OUT=$(git merge-tree HEAD origin/main 2>&1) || true
+            CONFLICT_FILES=$(echo "${MERGE_OUT}" | awk '/^CONFLICT \(content\): Merge conflict in /{printf "%s%s",(NR==1?"":","),($(NF))}')
+          fi
+          echo "conflict_files=${CONFLICT_FILES}" >> "$GITHUB_OUTPUT"
+
+      - name: Run preflight checks
+        id: preflight
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p reports
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/preflight.py \
+            --branch-name "${{ github.head_ref }}" \
+            --behind-by "${{ steps.sync.outputs.behind_by || '0' }}" \
+            --conflict-files "${{ steps.sync.outputs.conflict_files }}" \
+            --ci-config-path "$CICFG" \
+            --output reports/preflight.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Post preflight comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/post_gate_comment_runner.py \
+            --gate preflight --report reports/preflight.json \
+            --pr "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+
+      - name: Emit ci/preflight success
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/preflight" --state "success" \
+            --description "Preflight passed" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Emit ci/preflight failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/preflight" --state "failure" \
+            --description "Preflight failed — see PR comment" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ─── LOGICAL MODEL ────────────────────────────────────────────────────────
+  # Runs the canonical logical-model checks (validate, coverage, suppliers, notes and
+  # generate-tests --check) over the Domain's logical-model/ with the vibedata-ossie package. A Domain
+  # without logical-model/ is skipped with a notice and passes. No `needs:` and no status
+  # context of its own.
+  logical-model:
+    name: Logical model
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0  # odcs diff needs the merge-base with the PR's base
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install the logical-model tooling
+        run: pip install vibedata-ossie vibedata-odcs --quiet
+
+      - name: Check the logical model
+        run: python3 .github/scripts/logical_model_gate.py --repo-map repo-map.json
+
+  # ─── ADR NUMBERING ────────────────────────────────────────────────────────
+  # Standalone check: fails the PR if the ADR directory has duplicate leading numbers, or
+  # any ADR-00NN citation under docs/** has no matching file. No `needs:` — this
+  # check is independent of preflight and every other gate.
+  adr-numbering:
+    name: "ci/adr-numbering: ADR number + reference check"
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Emit ci/adr-numbering pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/adr-numbering" --state "pending" \
+            --description "Checking ADR numbering + cross-references" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Run ADR numbering check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/adr_lint.py \
+            --pr-number "${{ github.event.pull_request.number }}"
+
+      - name: Emit ci/adr-numbering success
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/adr-numbering" --state "success" \
+            --description "No duplicate ADR numbers or dangling references" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Emit ci/adr-numbering failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/adr-numbering" --state "failure" \
+            --description "ADR numbering check failed — see job log" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ─── STATIC ANALYSIS ──────────────────────────────────────────────────────────
+  # Gate 0: ruff + sqlfluff + gitleaks + dbt compile + scorecard + schema gate.
+  # dbt compile uses dbt_motherduck_compile (offline, in-memory DuckDB, database: <PROD_DB_NAME>).
+  static-analysis:
+    name: "ci/static-check: static analysis"
+    needs: [preflight]
+    runs-on: ubuntu-latest
+    env:
+      PROD_DB_NAME: ${{ needs.preflight.outputs.prod_db_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install analysis tools
+        run: |
+          DUCKDB_VERSION=$(curl -fsSL https://motherduck.com/docs/duckdb-versions.json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['duckdb']['motherduck_regions']['global']['max'])")
+          pip install ruff sqlfluff sqlfluff-templater-dbt pyyaml dbt-core dbt-duckdb "duckdb==${DUCKDB_VERSION}" --quiet
+          case "$(uname -m)" in
+            arm64|aarch64) GITLEAKS_ARCH=linux_arm64 ;;
+            *)              GITLEAKS_ARCH=linux_x64 ;;
+          esac
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_${GITLEAKS_ARCH}.tar.gz" \
+            | tar xz -C /usr/local/bin gitleaks
+
+      - run: mkdir -p reports
+
+      - name: Emit Gate 0 pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/static-check" --state "pending" \
+            --description "Gate 0: static analysis running" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: ruff
+        continue-on-error: true
+        run: ruff check . --extend-exclude .github,ingestion/sources --output-format json > reports/ruff.json 2>/dev/null
+
+      - name: Prepare dbt-aware SQL linting
+        continue-on-error: true
+        env:
+          SQLFLUFF_DBT_PROFILE: dbt_motherduck_compile
+          SQLFLUFF_DBT_TARGET: compile
+        run: |
+          dbt deps --project-dir "$PROJ" --quiet 2>/dev/null || true
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/prepare_sqlfluff_dbt.py
+
+      - name: sqlfluff
+        continue-on-error: true
+        run: sqlfluff lint "$PROJ/models" --dialect duckdb --format json > reports/sqlfluff.json 2> reports/sqlfluff.stderr || { rc=$?; cat reports/sqlfluff.stderr >&2; exit $rc; }
+
+      - name: gitleaks
+        continue-on-error: true
+        run: |
+          gitleaks detect --source . \
+            --report-format json \
+            --report-path reports/gitleaks.json \
+            --no-banner 2>/dev/null
+          [ -f reports/gitleaks.json ] || echo '[]' > reports/gitleaks.json
+
+      - name: dbt scorecard
+        continue-on-error: true
+        run: |
+          dbt compile \
+            --project-dir "$PROJ" \
+            --profiles-dir .github/profiles \
+            --profile dbt_motherduck_compile \
+            --target compile \
+            --exclude package:elementary --quiet 2>/dev/null || true
+          python3 ${{ env.SCRIPTS }}/scorecard.py \
+            --manifest "$PROJ/target/manifest.json" \
+            --agents-md AGENTS.md \
+            > reports/scorecard.json
+
+      - name: dbt compile
+        continue-on-error: true
+        run: |
+          python3 ${{ env.SCRIPTS }}/dbt_error_report.py reports/dbt_compile.json \
+            compile \
+            --project-dir "$PROJ" \
+            --profiles-dir .github/profiles \
+            --profile dbt_motherduck_compile \
+            --target compile \
+            --exclude package:elementary || true
+
+      - name: Schema gate
+        continue-on-error: true
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/schema_gate.py \
+            --manifest "$PROJ/target/manifest.json" \
+            --repo "${{ github.repository }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --output reports/schema_gate.json || true
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-reports-pr${{ github.event.pull_request.number }}
+          path: reports/
+          retention-days: 30
+
+      - name: Post gate-0 comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/gate_0_comment_runner.py \
+            --pr "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL"
+
+      - name: Gate 0 evaluate
+        if: always()
+        run: |
+          python3 ${{ env.SCRIPTS }}/gate_0_evaluate_runner.py
+
+      - name: Emit Gate 0 final status
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/static-check" --job-status "$JOB_STATUS" \
+            --success-description "Gate 0: all checks passed" \
+            --failure-description "Gate 0: one or more checks failed" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ─── FETCH PROD STATE ─────────────────────────────────────────────────────────
+  # Gate 1: download prod-manifest-motherduck → dbt ls --state → emit deployment manifest.
+  # dbt_motherduck_compile is offline; no MotherDuck live connection required here.
+  fetch-prod-state:
+    name: "ci/state-modified+: fetch prod state"
+    needs: [preflight]
+    runs-on: ubuntu-latest
+    env:
+      PROD_DB_NAME: ${{ needs.preflight.outputs.prod_db_name }}
+    outputs:
+      greenfield_fallback: ${{ steps.fetch.outputs.greenfield_fallback }}
+      platform_error_mode: ${{ steps.fetch.outputs.mode }}
+      platform_error_category: ${{ steps.fetch.outputs.category }}
+      platform_error_reason: ${{ steps.fetch.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dbt-duckdb
+        run: |
+          DUCKDB_VERSION=$(curl -fsSL https://motherduck.com/docs/duckdb-versions.json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['duckdb']['motherduck_regions']['global']['max'])")
+          pip install pyyaml dbt-core dbt-duckdb "duckdb==${DUCKDB_VERSION}" --quiet
+
+      - name: Emit Gate 1 pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/state-modified+" --state "pending" \
+            --description "Gate 1: fetching prod state" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Fetch prod state
+        id: fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/fetch_prod_state.py
+
+      - name: Parse dbt project
+        run: |
+          dbt deps --project-dir "$PROJ" --quiet
+          dbt parse \
+            --project-dir "$PROJ" \
+            --profiles-dir .github/profiles \
+            --profile dbt_motherduck_compile \
+            --target compile \
+            --quiet
+
+      - name: Emit deployment manifest
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p reports
+          python3 ${{ env.SCRIPTS }}/emit_deployment_manifest.py
+
+      - name: Show modified set
+        if: always() && steps.fetch.outputs.greenfield_fallback != 'true' && hashFiles('prod-state/manifest.json') != ''
+        run: |
+          modified=$(dbt ls \
+                       --project-dir "$PROJ" \
+                       --select state:modified+ \
+                       --state "$(pwd)/prod-state" \
+                       --profiles-dir .github/profiles \
+                       --profile dbt_motherduck_compile \
+                       --target compile \
+                       --output name 2>/dev/null | grep -v '^\(Running\|Found\|Update\)' || true)
+          echo "::group::state:modified+ closure"
+          if [ -z "$modified" ]; then
+            echo "::notice title=state:modified+::(empty — no models changed vs prod baseline)"
+          else
+            while IFS= read -r m; do
+              [ -n "$m" ] && echo "::notice title=state:modified+::state:modified+ => $m"
+            done <<< "$modified"
+          fi
+          echo "::endgroup::"
+
+      - name: Upload prod-state artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-state-pr${{ github.event.pull_request.number }}
+          path: prod-state/
+          retention-days: 7
+
+      - name: Upload deployment manifest artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manifest-${{ github.event.pull_request.head.sha }}
+          path: reports/deployment-manifest-${{ github.event.pull_request.head.sha }}.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Post gate-1 comment
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GREENFIELD_FALLBACK: ${{ steps.fetch.outputs.greenfield_fallback }}
+          PLATFORM_ERROR_MODE: ${{ steps.fetch.outputs.mode }}
+          PLATFORM_ERROR_CATEGORY: ${{ steps.fetch.outputs.category }}
+          PLATFORM_ERROR_REASON: ${{ steps.fetch.outputs.reason }}
+          JOB_STATUS: ${{ job.status }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/gate_1_comment_runner.py --job-status "$JOB_STATUS" \
+            --greenfield "$GREENFIELD_FALLBACK" --error-mode "$PLATFORM_ERROR_MODE" \
+            --error-category "$PLATFORM_ERROR_CATEGORY" --error-reason "$PLATFORM_ERROR_REASON" \
+            --head-sha "$HEAD_SHA" --pr "$PR_NUMBER" --repo "$REPO"
+
+      - name: Emit Gate 1 final status
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/state-modified+" --job-status "$JOB_STATUS" \
+            --success-description "Gate 1: prod state resolved" \
+            --failure-description "Gate 1: failed — see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ─── DESIGN-DRIFT ─────────────────────────────────────────────────────────────
+  # LLM-based gate: compares changed design records against the state:modified closure.
+  # Runs after Gate 1; Gate 2 only starts once this passes.
+  design-drift:
+    name: "ci/design-drift: design records vs state:modified"
+    needs: [preflight, fetch-prod-state]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROD_DB_NAME: ${{ needs.preflight.outputs.prod_db_name }}
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+      # Every step in this job, including the PR-checked-out dbt parse and runner, can mint an OIDC
+      # token; the GCP provider's attribute condition and repository binding bound who may exchange
+      # it (docs/ops-runbook.md §7).
+      id-token: write   # GitHub OIDC → Google Cloud for a Vertex AI default profile
+    steps:
+      # A Vertex AI default profile publishes a workload identity provider instead of a key; the
+      # job trades its GitHub OIDC token for a short-lived Google access token. Both steps run
+      # before checkout, so no PR code has run yet to steer the decision (through ci-config.yml,
+      # $GITHUB_ENV or the action's runtime) or to read the exchange. Every input is a fixed
+      # VD_CI_* repository variable.
+      - name: Decide Vertex AI federation
+        id: gcp-federation
+        # A Sync never deletes variables, so a provider left by an earlier Vertex profile must not
+        # federate (and fail on a removed pool) once the default profile points elsewhere.
+        # An empty service_account makes the action federate as the pool principal itself, not as
+        # the profile's identity, so both variables must be published.
+        # The URL comes from the fixed VD_CI_LLM_API_URL, not the gate's mapped variable: ci-config.yml
+        # is PR-controlled and the mapping is empty when preflight fails. The gate then sends to the
+        # URL checked here, so a token never reaches a URL this step did not classify.
+        # VERTEX is design_drift_runner.VERTEX_URL_PATTERN verbatim (a unit test pins them equal), so
+        # this step and the runner classify every URL alike. LC_ALL=C keeps the lowercasing to ASCII,
+        # as the runner's re.ASCII does. CR, LF and tab are refused on both sides.
+        # GitHub rejects a key=value output holding %, CR or LF, and a failed write here would skip
+        # every later step, so the URL goes out in the delimiter form with a delimiter it cannot guess.
+        env:
+          PROVIDER: ${{ vars.VD_CI_LLM_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SERVICE_ACCOUNT: ${{ vars.VD_CI_LLM_GCP_SERVICE_ACCOUNT }}
+          API_URL: ${{ vars.VD_CI_LLM_API_URL }}
+        run: |
+          export LC_ALL=C
+          VERTEX='^https://([^/?#@]*@)?([a-z]+-[a-z]+[1-9][0-9]?-)?aiplatform\.googleapis\.com\.?(:[0-9]+)?([/?#]|$)'
+          # The path test is design_drift_runner._vertex_endpoint_error on the URL as written (the
+          # path is case-sensitive), so a token is minted only for a URL the runner will send it to.
+          path="${API_URL#*://}"
+          path="${path%%[?#]*}"
+          if [[ "$path" == */* ]]; then path="/${path#*/}"; else path=""; fi
+          while [[ "$path" == */ ]]; do path="${path%/}"; done
+          path="${path%/chat/completions}"
+          if [[ -n "$PROVIDER" && -n "$SERVICE_ACCOUNT" && "$API_URL" != *[$'\r\n\t']* && "${API_URL,,}" =~ $VERTEX \
+                && "$path" == */endpoints/openapi ]]; then
+            DELIM="VD_CI_GCP_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+            {
+              echo "federate=true"
+              echo "api_url<<$DELIM"
+              printf '%s\n' "$API_URL"
+              echo "$DELIM"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
+        if: steps.gcp-federation.outputs.federate == 'true'
+        # The gate reads this step's outcome and posts the cause itself; a failed exchange must not
+        # skip the gate and leave ci/design-drift with only the generic pre-runner status.
+        continue-on-error: true
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.VD_CI_LLM_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.VD_CI_LLM_GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: false
+          export_environment_variables: false
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dbt-duckdb
+        run: |
+          DUCKDB_VERSION=$(curl -fsSL https://motherduck.com/docs/duckdb-versions.json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['duckdb']['motherduck_regions']['global']['max'])")
+          pip install pyyaml dbt-core dbt-duckdb "duckdb==${DUCKDB_VERSION}" --quiet
+
+      - name: Emit ci/design-drift pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/design-drift" --state "pending" \
+            --description "Gate: design-drift running" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Download deployment manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-manifest-${{ github.event.pull_request.head.sha }}
+          path: reports/
+
+      - name: Write modified.json from deployment manifest
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/write_modified_json.py --head-sha "$HEAD_SHA"
+
+      - name: Parse dbt project
+        id: parse
+        # The parse output is kept so a parse failure can be relayed
+        # on this gate's own status. An artifact that stops the project parsing
+        # is exactly what these gates exist to judge, and it was the one case
+        # where they reported nothing but "see job logs".
+        run: |
+          set -o pipefail
+          dbt deps --project-dir "$PROJ" --quiet 2>&1 | tee -a gate-parse.log
+          dbt parse \
+            --project-dir "$PROJ" \
+            --profiles-dir .github/profiles \
+            --profile dbt_motherduck_compile \
+            --target compile \
+            --quiet 2>&1 | tee -a gate-parse.log
+
+      - name: Resolve changed paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --name-only --diff-filter=d "$BASE_SHA"...HEAD > changed-paths.txt
+
+      - name: Run design-drift gate
+        id: run-gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          LLM_API_KEY: ${{ secrets[needs.preflight.outputs.llm_api_key_var] }}
+          LLM_API_URL: ${{ vars[needs.preflight.outputs.llm_api_url_var] }}
+          # Set only when the federation decision passed, to the exact URL it checked. The run script
+          # prefers it, so a token is only ever sent to that Vertex AI endpoint and never to a URL the
+          # PR names. Chosen in shell: an expression `A && B || C` falls through to C whenever B is empty.
+          LLM_FEDERATED_API_URL: ${{ steps.gcp-federation.outputs.api_url }}
+          LLM_MODEL: ${{ vars[needs.preflight.outputs.llm_model_var] }}
+          # The token reaches this step only: the dbt steps above run PR code, so no other step may
+          # receive it.
+          LLM_GCP_ACCESS_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
+          LLM_GCP_AUTH_OUTCOME: ${{ steps.gcp-auth.outcome }}
+          # Read only to name which variable is empty when no token was minted.
+          LLM_GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.VD_CI_LLM_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          LLM_GCP_SERVICE_ACCOUNT: ${{ vars.VD_CI_LLM_GCP_SERVICE_ACCOUNT }}
+        run: |
+          # Every run names its path, so an operator can tell a federated run from a skipped one.
+          # No URL is printed: a Vertex AI URL may carry userinfo.
+          if [[ -n "$LLM_FEDERATED_API_URL" ]]; then
+            LLM_API_URL="$LLM_FEDERATED_API_URL"
+            echo "::notice::design-drift federated: the federated token is used with the URL the federation decision checked; the mapped LLM_API_URL is not used"
+          else
+            echo "::notice::design-drift did not federate: it uses the mapped LLM_API_URL and key"
+          fi
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/design_drift_runner.py \
+            --pr-number  "${{ github.event.pull_request.number }}" \
+            --head-sha   "${{ github.event.pull_request.head.sha }}" \
+            --changed-paths changed-paths.txt \
+            --manifest   "$PROJ/target/manifest.json" \
+            --modified   "reports/modified.json"
+
+      - name: Emit ci/design-drift final-status failure
+        if: failure() && steps.run-gate.conclusion != 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PARSE_OUTCOME: ${{ steps.parse.outcome }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/design_drift_fallback_status.py \
+            --parse-outcome "$PARSE_OUTCOME" --sha "$CI_HEAD_SHA" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ─── GATE 2 — CI/RUN ──────────────────────────────────────────────────────────
+  # Clones prd → pr_<N>_<sha>, runs dbt.
+  # Reads model names from the deployment-manifest artifact emitted by Gate 1.
+  gate-2-run:
+    name: "ci/run: MotherDuck dbt build"
+    needs: [preflight, fetch-prod-state, design-drift]
+    runs-on: ubuntu-latest
+    env:
+      MOTHERDUCK_TOKEN: ${{ secrets[needs.preflight.outputs.motherduck_token_var] }}
+      PROD_DB_NAME: ${{ needs.preflight.outputs.prod_db_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dbt-duckdb
+        run: |
+          DUCKDB_VERSION=$(curl -fsSL https://motherduck.com/docs/duckdb-versions.json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['duckdb']['motherduck_regions']['global']['max'])")
+          pip install pyyaml dbt-core dbt-duckdb "duckdb==${DUCKDB_VERSION}" --quiet
+
+      - name: Emit ci/run pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/run" --state "pending" \
+            --description "Gate 2: cloning prd and running dbt" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Download deployment manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-manifest-${{ github.event.pull_request.head.sha }}
+          path: reports/
+
+      - name: Clone prd → per-PR MotherDuck database
+        id: clone-db
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA_SHORT: ${{ github.event.pull_request.head.sha }}
+          DOMAIN_SLUG: ${{ needs.preflight.outputs.domain }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate_2_runner.py clone --pr "$PR_NUMBER" \
+            --head-sha "$HEAD_SHA_SHORT" --domain "$DOMAIN_SLUG" --prod-db "$PROD_DB_NAME"
+
+      - name: Drop stale per-SHA databases for this PR
+        if: steps.clone-db.outcome == 'success'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DB_NAME: ${{ steps.clone-db.outputs.db_name }}
+          DOMAIN_SLUG: ${{ needs.preflight.outputs.domain }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate_2_runner.py drop-stale --pr "$PR_NUMBER" \
+            --db-name "$DB_NAME" --domain "$DOMAIN_SLUG"
+
+      - name: dbt deps/seed/run — build closure against per-PR clone
+        id: dbt-run
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA_SHORT: ${{ steps.clone-db.outputs.head_sha_short }}
+          DOMAIN_SLUG: ${{ needs.preflight.outputs.domain }}
+          MOTHERDUCK_TOKEN: ${{ env.MOTHERDUCK_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p reports
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate_2_runner.py select --head-sha "$HEAD_SHA"
+
+          dbt deps --project-dir "$PROJ" --profiles-dir .github/profiles --profile dbt_motherduck_ci --quiet
+
+          # Seed before build so a state:modified model's ref() to a
+          # dbt seed resolves. Unconditional — the deployment manifest lists only
+          # models, never seeds. Seed's exit code is captured but not enforced —
+          # mirrors the dbt deps call above (also unguarded); the real pass/fail
+          # signal comes from gate_2_result.assemble's overall_status, same as
+          # Fabric's approach in gate2_fabric_runner.py (a seed referenced by a
+          # model in this PR's closure surfaces there as a downstream build
+          # failure; a seed referenced only by something outside this PR's
+          # closure will not — the echo below exists purely so a human scanning
+          # the job log for "why didn't my seed load" has something to find).
+          dbt seed --project-dir "$PROJ" --profiles-dir .github/profiles --profile dbt_motherduck_ci --target ci --no-use-colors 2>&1 || SEED_RC=$?
+          echo "dbt seed exit code: ${SEED_RC:-0}"
+
+          SELECT=$(cat reports/gate2_select.txt)
+          if [ -n "$SELECT" ]; then
+            # `|| true` deliberately swallows dbt's own exit code so the "Assemble
+            # gate-2 result" step below still runs and reads run_results.json even
+            # when dbt errors — that's what lets the PR comment show the actual
+            # per-model failure. The real pass/fail signal comes from
+            # gate_2_result.assemble's overall_status, not this step's exit code.
+            dbt run \
+              --project-dir "$PROJ" \
+              --select $SELECT \
+              --profiles-dir .github/profiles \
+              --profile dbt_motherduck_ci \
+              --target ci \
+              --no-use-colors 2>&1 || true
+          else
+            echo "No models to build — gate-2 passes with empty artifact list"
+          fi
+
+      - name: Assemble gate-2 result and save report
+        id: assemble
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DB_CREATED: ${{ steps.clone-db.outcome == 'success' && 'true' || 'false' }}
+          DB_NAME: ${{ steps.clone-db.outputs.db_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA_SHORT: ${{ steps.clone-db.outputs.head_sha_short }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate_2_runner.py assemble --head-sha "$HEAD_SHA" \
+            --db-created "$DB_CREATED" --db-name "$DB_NAME"
+
+      - name: Post gate-2 comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/post_gate_comment_runner.py \
+            --gate gate-2 --report reports/gate-2.json \
+            --pr "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL"
+
+      - name: Emit ci/run final status
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate_2_status_runner.py --report reports/gate-2.json \
+            --sha "$CI_HEAD_SHA" --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+  # ─── GATE 3 — UNIT TESTS ─────────────────────────────────────────────────────
+  # Gate 3: dbt unit tests against the per-PR MotherDuck clone (md:pr_<N>_<sha>).
+  # Runs in parallel with gate-4-data-test; both need gate-2-run only.
+  gate-3-unit:
+    name: "ci/unit-tests: dbt unit tests (MotherDuck)"
+    needs: [preflight, gate-2-run]
+    runs-on: ubuntu-latest
+    if: always() && needs.gate-2-run.result == 'success'
+    env:
+      MOTHERDUCK_TOKEN: ${{ secrets[needs.preflight.outputs.motherduck_token_var] }}
+
+    concurrency:
+      group: ci-gate3-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dbt-duckdb
+        run: |
+          DUCKDB_VERSION=$(curl -fsSL https://motherduck.com/docs/duckdb-versions.json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['duckdb']['motherduck_regions']['global']['max'])")
+          pip install pyyaml dbt-core dbt-duckdb "duckdb==${DUCKDB_VERSION}" --quiet
+
+      - run: mkdir -p reports
+
+      - name: Emit ci/unit-tests pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/emit_status.py \
+            --sha "$CI_HEAD_SHA" \
+            --context "ci/unit-tests" --state "pending" \
+            --description "Gate 3: unit tests running" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Download deployment manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-manifest-${{ github.event.pull_request.head.sha }}
+          path: reports/
+
+      - name: Install dbt packages
+        run: dbt deps --project-dir "$PROJ" --profiles-dir .github/profiles --profile dbt_motherduck_ci --quiet
+
+      - name: Run dbt unit tests
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DOMAIN_SLUG: ${{ needs.preflight.outputs.domain }}
+          # MOTHERDUCK_TOKEN is set in $GITHUB_ENV by the prior step and is
+          # inherited by the subprocess automatically — no explicit env: entry needed.
+        run: |
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate_3_unit_runner.py --head-sha "$HEAD_SHA"
+
+      - name: Upload gate-3 reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate-3-reports-pr${{ github.event.pull_request.number }}
+          path: reports/gate-3.json
+          retention-days: 30
+
+      - name: Emit ci/unit-tests final status
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/gate_3_status_runner.py \
+            --job-status "$JOB_STATUS" --report reports/gate-3.json --sha "$CI_HEAD_SHA" \
+            --target-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  gate-3-unit-comment:
+    name: "gate-3-unit comment"
+    needs: [preflight, gate-2-run, gate-3-unit]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download gate-3 reports
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: gate-3-reports-pr${{ github.event.pull_request.number }}
+          path: reports/
+
+      - name: Post gate-3 comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REAL_WORK_RESULT: ${{ needs.gate-3-unit.result }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/post_gate_comment_runner.py \
+            --gate gate-3 --report reports/gate-3.json \
+            --pr "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --real-work-result "$REAL_WORK_RESULT"
+
+  # ─── GATE 4 — CI/DATA-TESTS ───────────────────────────────────────────────────
+  # `dbt test --store-failures` against the per-PR clone (md:pr_<N>_<sha>) created by Gate 2.
+  # gate4_runner.py is a thin shell: env read → dbt subprocess → run_results parse → status post.
+  gate-4-data-test:
+    name: "ci/data-tests: dbt test --store-failures"
+    needs: [preflight, gate-2-run]
+    runs-on: ubuntu-latest
+    if: always() && needs.gate-2-run.result == 'success'
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve layout
+        run: |
+          echo "PROJ=$([ -f transformation/dbt_project.yml ] && echo transformation || echo .)" >> "$GITHUB_ENV"
+          echo "CICFG=.workflow/ci-config.yml" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dbt-duckdb
+        run: |
+          DUCKDB_VERSION=$(curl -fsSL https://motherduck.com/docs/duckdb-versions.json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['duckdb']['motherduck_regions']['global']['max'])")
+          pip install pyyaml dbt-core dbt-duckdb "duckdb==${DUCKDB_VERSION}" --quiet
+
+      - name: Download deployment manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-manifest-${{ github.event.pull_request.head.sha }}
+          path: reports/
+        continue-on-error: true
+
+      - name: Compute head_sha_short
+        id: sha
+        run: echo "short=$(echo '${{ github.event.pull_request.head.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Run Gate 4 (gate4_runner.py)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          MOTHERDUCK_TOKEN: ${{ secrets[needs.preflight.outputs.motherduck_token_var] }}
+          DOMAIN_SLUG: ${{ needs.preflight.outputs.domain }}
+        run: |
+          mkdir -p reports
+          python3 ${{ env.SCRIPTS }}/vibedata_domain_ci/gate4_runner.py run-gate \
+            --pr-number "${{ github.event.pull_request.number }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --head-sha-short "${{ steps.sha.outputs.short }}" \
+            --deployment-manifest "reports/deployment-manifest-${{ github.event.pull_request.head.sha }}.json" \
+            --dbt-project "$PROJ/dbt_project.yml" \
+            --profiles-dir ".github/profiles" \
+            --run-results "$PROJ/target/run_results.json" \
+            --manifest "$PROJ/target/manifest.json" \
+            --output "reports/gate-4.json"
+
+      - name: Upload Gate 4 report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-4-pr${{ github.event.pull_request.number }}
+          path: reports/gate-4.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  gate-4-data-test-comment:
+    name: "gate-4-data-test comment"
+    needs: [preflight, gate-2-run, gate-4-data-test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download gate-4 report
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: gate-4-pr${{ github.event.pull_request.number }}
+          path: reports/
+
+      - name: Post gate-4 comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REAL_WORK_RESULT: ${{ needs.gate-4-data-test.result }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/post_gate_comment_runner.py \
+            --gate gate-4 --report reports/gate-4.json \
+            --pr "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --real-work-result "$REAL_WORK_RESULT"
+
+  # ─── STATUS SWEEP ─────────────────────────────────────────────────────────────
+  # A job that never runs posts no commit status, so its required
+  # context stays pending for ever — branch protection blocks the merge and the
+  # PR never states why. This job runs on every outcome and posts a terminal
+  # failure for each required gate that did not conclude, naming the gates that
+  # actually failed. It never rewrites a status a gate posted for itself.
+  status-sweep:
+    name: "Sweep unrun required gates"
+    if: always() && github.event.action != 'closed'
+    needs: [preflight, adr-numbering, static-analysis, fetch-prod-state, design-drift, gate-2-run, gate-3-unit, gate-4-data-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Sweep unrun required gates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 ${{ env.SCRIPTS }}/gate_sweep_runner.py \
+            --platform motherduck \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --needs "$NEEDS_JSON"

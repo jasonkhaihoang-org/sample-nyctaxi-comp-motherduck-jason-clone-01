@@ -2,7 +2,7 @@
 
 Gathers, for `dbt-manifest-<sha>`: whether it exists, and if so, per-asset presence and content
 match against this run's assets -- yielding one of `absent` / `complete_match` / `incomplete` /
-`complete_mismatch`. Builds `manifest-source.json` (ADR-0027/D-12's five fields) from job-local
+`complete_mismatch`. Builds `manifest-source.json` (five provenance fields) from job-local
 scalars. Calls `dbt_docs_publish.build_manifest_release_commands` exactly once with that gathered
 state and dispatches every returned `gh` command, then does the same for
 `dbt_docs_publish.build_prune_commands` over the full `dbt-manifest-*` release set. Invoked
@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dbt_docs_publish import (
+from vibedata_domain_ci.dbt_docs_publish import (
     MANIFEST_RELEASE_TAG_PREFIX,
     PROVENANCE_ASSET,
     build_manifest_release_commands,
@@ -24,7 +24,7 @@ from dbt_docs_publish import (
     classify_release_state,
     manifest_release_tag,
 )
-from dbt_version_provenance import resolve_installed_versions
+from vibedata_domain_ci.dbt_version_provenance import resolve_installed_versions
 
 
 def _now_iso() -> str:
@@ -124,8 +124,8 @@ def main(target_dir: str, sha: str, asset_names: list[str]) -> int:
     except subprocess.CalledProcessError as exc:
         # Matches _gather_release_state's existing safety net for `gh release view`: a
         # bare CalledProcessError with no visible reason is exactly what made three
-        # separate real CI failures on this exact call undiagnosable without guessing
-        #. Print everything available -- stdout included, since a partial
+        # separate real CI failures on this exact call undiagnosable without guessing.
+        # Print everything available -- stdout included, since a partial
         # response before a mid-stream failure can also be diagnostic.
         print(
             f"gh release list exited {exc.returncode}:\n"

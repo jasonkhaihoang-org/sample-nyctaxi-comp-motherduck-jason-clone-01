@@ -21,10 +21,11 @@ FABRIC_LAKEHOUSE = "fabric_lakehouse"
 FABRIC_WAREHOUSE = "fabric_warehouse"
 MOTHERDUCK = "motherduck"
 DUCKDB_LOCAL = "duckdb_local"
+REDSHIFT = "redshift"
 SNOWFLAKE = "snowflake"
 DATABRICKS = "databricks"
 
 # Ordered so argparse `choices` and validation error text render deterministically.
-PLATFORMS = (FABRIC_LAKEHOUSE, FABRIC_WAREHOUSE, MOTHERDUCK, DUCKDB_LOCAL, SNOWFLAKE, DATABRICKS)
+PLATFORMS = (FABRIC_LAKEHOUSE, FABRIC_WAREHOUSE, MOTHERDUCK, DUCKDB_LOCAL, REDSHIFT, SNOWFLAKE, DATABRICKS)
 
 VALID_PLATFORMS = frozenset(PLATFORMS)
