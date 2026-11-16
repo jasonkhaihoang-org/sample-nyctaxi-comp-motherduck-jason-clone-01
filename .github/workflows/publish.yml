@@ -20,9 +20,9 @@ jobs:
   publish-manifest:
     # dbt-docs-latest is production state: a manual run from another branch is refused here.
     if: github.ref == 'refs/heads/main'
-    uses: accelerate-data/vibedata-official/.github/workflows/publish-manifest.yml@domain-ci/v1.0.0rc25
+    uses: accelerate-data/vibedata-official/.github/workflows/publish-manifest.yml@domain-ci/v1.0.0rc26
 
   publish-docs:
     needs: publish-manifest
     if: github.ref == 'refs/heads/main'
-    uses: accelerate-data/vibedata-official/.github/workflows/publish-docs.yml@domain-ci/v1.0.0rc25
+    uses: accelerate-data/vibedata-official/.github/workflows/publish-docs.yml@domain-ci/v1.0.0rc26
