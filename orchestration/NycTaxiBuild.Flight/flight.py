@@ -7,7 +7,7 @@ import sys
 from dbt.cli.main import dbtRunner
 from vibedata.flight import checkout, dbt_run_dir, report_dbt_run
 
-GIT_REPO = "accelerate-data/sample-nyctaxi-comp-motherduck"
+GIT_REPO = "jasonkhaihoang-org/sample-nyctaxi-comp-motherduck-jason-clone-01"
 GIT_REF = os.environ["GIT_REF"]
 PROJECT_SUBDIR = "transformation"
 GIT_SECRET_NAME = "nyc_taxi_motherduck_demo_git_auth"
