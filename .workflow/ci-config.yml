@@ -1,8 +1,8 @@
 # Domain CI Configuration — MotherDuck
 VD_DOMAIN_DATA_PLATFORM: motherduck
-VD_DOMAIN_SLUG: nyc-taxi-motherduck-demo
+VD_DOMAIN_SLUG: motherduck-01
 VD_DOMAIN_SCHEMA: main
-VD_DOMAIN_MOTHERDUCK_DATABASE: sa_prd
+VD_DOMAIN_MOTHERDUCK_DATABASE: prd
 
 VD_DOMAIN_PROD_MANIFEST_SOURCE:
   mode: artifact

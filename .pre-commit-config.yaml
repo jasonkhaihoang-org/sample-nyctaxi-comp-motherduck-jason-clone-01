@@ -1,0 +1,20 @@
+repos:
+  # BEGIN vibedata hooks (managed by install-ci)
+  - repo: local
+    hooks:
+      - id: vibedata-pre-commit
+        name: vibedata pre-commit
+        entry: sh -c 'command -v vibedata-pre-commit >/dev/null 2>&1 || { echo "vibedata-pre-commit not installed, skipping" >&2; exit 0; }; exec vibedata-pre-commit'
+        language: system
+        pass_filenames: false
+        stages:
+        - pre-commit
+      - id: vibedata-pre-push
+        name: vibedata pre-push
+        entry: sh -c 'command -v vibedata-pre-push >/dev/null 2>&1 || { echo "vibedata-pre-push not installed, skipping" >&2; exit 0; }; exec vibedata-pre-push'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+        - pre-push
+  # END vibedata hooks

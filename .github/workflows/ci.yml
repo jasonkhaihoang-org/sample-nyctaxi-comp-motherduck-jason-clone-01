@@ -1,0 +1,54 @@
+# Vibedata Domain CI caller (written by onboarding; identical on every platform). Edit only the pin, which the
+# release's Dependabot PR moves. Secret names come from .workflow/ci-config.yml, never from this file.
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# A new push cancels this PR's run still going for an older commit (ci-engine AC-109). One group per PR number, so
+# another PR's run never shares it. `provision` finishes an in-flight create; nothing else starts (AC-33).
+concurrency:
+  group: domain-ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # ci / verdict posts the CI plan comment
+  id-token: write        # Fabric and MotherDuck OIDC sign-in
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      llm_api_key: ${{ steps.read.outputs.LLM_API_KEY_VAR }}
+      llm_api_url: ${{ steps.read.outputs.LLM_API_URL_VAR }}
+      llm_model: ${{ steps.read.outputs.LLM_MODEL_VAR }}
+      motherduck_token: ${{ steps.read.outputs.MOTHERDUCK_TOKEN_VAR }}
+    steps:
+      # The PR branch's ci-config.yml names the secrets: the repo owns that file, and this caller itself runs from the
+      # PR branch, so reading the base would guard nothing.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: .workflow/ci-config.yml
+          sparse-checkout-cone-mode: false
+      # Reads each secret's name from .workflow/ci-config.yml (AC-29) with sed: no install, no Vibedata code.
+      - id: read
+        run: |
+          for key in LLM_API_KEY_VAR LLM_API_URL_VAR LLM_MODEL_VAR MOTHERDUCK_TOKEN_VAR; do
+            value=$(sed -n -E "s/^${key}:[[:space:]]*[\"']?([A-Za-z0-9_]*).*/\1/p" .workflow/ci-config.yml | head -n 1)
+            echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+          done
+
+  ci:
+    needs: config
+    uses: accelerate-data/vibedata-official/.github/workflows/domain-ci.yml@domain-ci/v1.0.0rc25
+    with:
+      llm_api_url: ${{ vars[needs.config.outputs.llm_api_url] }}
+      llm_model: ${{ vars[needs.config.outputs.llm_model] }}
+    secrets:
+      LLM_API_KEY: ${{ secrets[needs.config.outputs.llm_api_key] }}
+      MOTHERDUCK_TOKEN: ${{ secrets[needs.config.outputs.motherduck_token] }}

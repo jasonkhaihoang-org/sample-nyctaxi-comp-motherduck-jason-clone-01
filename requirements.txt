@@ -1,0 +1,17 @@
+## Vibedata
+vibedata-domain-ci==1.0.0rc25
+vibedata-domain-hooks==1.0.0rc25
+pyyaml==6.0.3
+pre-commit==4.7.0
+duckdb==1.5.6
+dbt-core
+dbt-duckdb
+dlt
+pip-audit
+pytest
+ruff
+sqlfluff
+sqlfluff-templater-dbt
+vibedata-dlt-duckdb-studio
+vibedata-odcs
+vibedata-ossie
